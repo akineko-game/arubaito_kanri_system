@@ -37,9 +37,9 @@ const STATES = {
 
 const EVENT_ROUTES = {
   LOGIN:               { from: [STATES.LOGGED_OUT],                                    to: STATES.SHIFT_REQ_PENDING,   roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.PART_TIME] },
-  SHIFT_REQUEST_SUBMIT:{ from: [STATES.SHIFT_REQ_PENDING],                             to: STATES.SHIFT_REQ_SUBMITTED, roles: [ROLES.PART_TIME] },
+  SHIFT_REQUEST_SUBMIT:{ from: [STATES.SHIFT_REQ_PENDING, STATES.SHIFT_REQ_SUBMITTED],  to: STATES.SHIFT_REQ_SUBMITTED, roles: [ROLES.PART_TIME] },
   SHIFT_SAVE:          { from: [STATES.SHIFT_CREATING],                                to: STATES.SHIFT_CREATING,      roles: [ROLES.MANAGER] },
-  SHIFT_CONFIRM:       { from: [STATES.SHIFT_CREATING],                                to: STATES.SHIFT_CONFIRMED,     roles: [ROLES.MANAGER] },
+  SHIFT_CONFIRM:       { from: [STATES.SHIFT_CREATING, STATES.SHIFT_CONFIRMED],       to: STATES.SHIFT_CONFIRMED,     roles: [ROLES.MANAGER] },
   SHIFT_PUBLISH:       { from: [STATES.SHIFT_CONFIRMED],                               to: STATES.SHIFT_PUBLISHED,     roles: [ROLES.ADMIN, ROLES.MANAGER] },
   ABSENCE_APPLY:       { from: [STATES.SHIFT_PUBLISHED, STATES.ABSENCE_APPLYING],      to: STATES.ABSENCE_APPLYING,    roles: [ROLES.PART_TIME] },
   CLOCK_IN:            { from: [STATES.PRE_WORK],                                      to: STATES.WORKING,             roles: [ROLES.PART_TIME, ROLES.MANAGER, ROLES.ADMIN] },
@@ -73,10 +73,10 @@ const DEMO = {
     { id:  4, name: '鈴木 恵子',   role: ROLES.MANAGER,    state: STATES.SHIFT_CONFIRMED,     store: '新宿店', age: 31, hourlyRate: null, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '公開待ち' },
     { id:  5, name: '伊藤 誠',     role: ROLES.MANAGER,    state: STATES.ATTENDANCE_PENDING,  store: '池袋店', age: 40, hourlyRate: null, clockIn: '09:55', clockOut: '19:10', breakMin: 60, overtimeMin: 75,  note: '勤怠確認要' },
     { id:  6, name: '渡辺 美香',   role: ROLES.MANAGER,    state: STATES.WORKING,             store: '渋谷店', age: 29, hourlyRate: null, clockIn: '13:00', clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '現在シフト指揮中' },
-    { id:  7, name: '田中 花子',   role: ROLES.PART_TIME,  state: STATES.SHIFT_REQ_PENDING,   store: '渋谷店', age: 20, hourlyRate: 1150, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '締切3日前' },
+    { id:  7, name: '田中 花子',   role: ROLES.PART_TIME,  state: STATES.SHIFT_REQ_SUBMITTED, store: '渋谷店', age: 20, hourlyRate: 1150, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '3件提出済み' },
     { id:  8, name: '中村 拓也',   role: ROLES.PART_TIME,  state: STATES.SHIFT_REQ_PENDING,   store: '新宿店', age: 19, hourlyRate: 1100, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '初月勤務' },
     { id:  9, name: '小林 さくら', role: ROLES.PART_TIME,  state: STATES.SHIFT_REQ_PENDING,   store: '池袋店', age: 17, hourlyRate: 1050, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '未成年・深夜禁止', isMinor: true },
-    { id: 10, name: '加藤 健太',   role: ROLES.PART_TIME,  state: STATES.SHIFT_REQ_PENDING,   store: '渋谷店', age: 22, hourlyRate: 1150, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '大学生' },
+    { id: 10, name: '加藤 健太',   role: ROLES.PART_TIME,  state: STATES.SHIFT_REQ_SUBMITTED, store: '渋谷店', age: 22, hourlyRate: 1150, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '3件提出済み' },
     { id: 11, name: '吉田 あおい', role: ROLES.PART_TIME,  state: STATES.SHIFT_REQ_PENDING,   store: '新宿店', age: 25, hourlyRate: 1200, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '週3希望' },
     { id: 12, name: '山本 勇気',   role: ROLES.PART_TIME,  state: STATES.SHIFT_REQ_SUBMITTED, store: '渋谷店', age: 21, hourlyRate: 1150, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '提出済み' },
     { id: 13, name: '松本 優',     role: ROLES.PART_TIME,  state: STATES.SHIFT_REQ_SUBMITTED, store: '池袋店', age: 18, hourlyRate: 1050, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '土日中心希望', isMinor: true },
@@ -332,11 +332,12 @@ function doShiftPublish() {
   const confirmedIds = new Set((DEMO.confirmedShifts || []).map(c => c.staffId));
   DEMO.staff.forEach(s => {
     if (confirmedIds.has(s.id)) {
-      // シフト公開済みに更新（勤務希望提出済み・公開済みなど途中状態も上書き）
       s.state = STATES.SHIFT_PUBLISHED;
-      s.note  = s.note?.includes('提出') ? `${s.note} → シフト公開済み` : 'シフト公開済み';
+      const prevNote = s.note || '';
+      s.note = prevNote.includes('公開') ? prevNote : prevNote + ' → シフト公開済み';
     }
   });
+  // confirmedShiftsにいないが同店舗の提出済みスタッフは「希望提出済み・割当なし」のまま
   logT('SHIFT_PUBLISH', `${store} のシフトを公開。対象${confirmedIds.size}名`);
 }
 
@@ -770,17 +771,21 @@ function buildView(state) {
           <div class="shift-row header"><span>日付</span><span>スタッフ</span><span>時間</span><span>操作</span></div>
           ${shiftRows.length > 0 ? shiftRows.join('') : '<div class="shift-row"><span style="color:var(--color-text-3)">勤務希望なし</span></div>'}
         </div>
-        ${!isConfirmedPhase ? `
         <div class="btn-row" style="margin-top:12px">
-          <button class="btn-secondary" id="btn-shift-draft">一時保存</button>
-          <button class="btn-primary"   id="btn-shift-confirm">シフトを確定する</button>
+          ${phase === 'published' ? '' : `
+            <button class="btn-secondary" id="btn-shift-draft">一時保存</button>
+            <button class="btn-primary"   id="btn-shift-confirm">
+              ${phase === 'confirmed' ? '再確定する' : 'シフトを確定する'}
+            </button>
+          `}
+          ${phase === 'confirmed' ? `
+            <button class="btn-primary" id="btn-shift-publish">スタッフへ公開する</button>
+          ` : ''}
         </div>
-        <p class="hint">割当確定した行だけが公式シフトになります。全員を入れる必要はありません。</p>
-        ` : phase === 'confirmed' ? `
-        <button class="btn-primary" id="btn-shift-publish" style="margin-top:12px">スタッフへ公開する</button>
-        ` : `
-        <p class="hint" style="color:var(--color-ok);margin-top:8px">✓ スタッフへ公開済みです</p>
-        `}
+        ${phase === 'published'
+          ? '<p class="hint" style="color:var(--color-ok);margin-top:8px">✓ スタッフへ公開済みです。追加割当は「再確定→再公開」が必要です。</p>'
+          : '<p class="hint">割当確定した行だけが公式シフトになります。後から追加も可能です。</p>'
+        }
       </div>`;
   }
 
@@ -1639,15 +1644,18 @@ function renderSidebar() {
           <i class="ti ti-layout-grid"></i>シフト作成中
         </button>`;
       if (phase === 'confirmed') return `
-        <button class="nav-tab done" id="tab-shift-mgmt" onclick="gotoShiftPhase()">
-          <i class="ti ti-layout-grid"></i>シフト作成<span class="tab-badge">確定済</span>
+        <button class="nav-tab" id="tab-shift-mgmt" onclick="gotoShiftPhase()">
+          <i class="ti ti-layout-grid"></i>シフト割当<span class="tab-badge">確定済</span>
         </button>
-        <button class="nav-tab next-target" onclick="gotoShiftPhase()">
-          <i class="ti ti-send"></i>シフト公開待ち
+        <button class="nav-tab next-target" onclick="appState.currentState=STATES.SHIFT_CONFIRMED; updateGuideOnStateChange()">
+          <i class="ti ti-send"></i>確定内容確認・公開
         </button>`;
       if (phase === 'published') return `
-        <button class="nav-tab done" id="tab-shift-mgmt" onclick="gotoShiftPhase()">
-          <i class="ti ti-layout-grid"></i>シフト管理<span class="tab-badge">公開済</span>
+        <button class="nav-tab" id="tab-shift-mgmt" onclick="gotoShiftPhase()">
+          <i class="ti ti-layout-grid"></i>シフト割当<span class="tab-badge">公開済</span>
+        </button>
+        <button class="nav-tab done" onclick="appState.currentState=STATES.SHIFT_CONFIRMED; updateGuideOnStateChange()">
+          <i class="ti ti-send"></i>確定内容<span class="tab-badge">公開済</span>
         </button>`;
       return '';
     })();
@@ -1758,15 +1766,16 @@ function jumpToMyWork() {
 }
 
 /* ─── シフトフェーズに応じた画面へ（店長用） ─── */
-function gotoShiftPhase() {
+function gotoShiftPhase(forceCreating) {
   const store = appState.currentStaff?.store;
   const phase = DEMO.shiftPhase?.[store] || 'creating';
-  if (phase === 'creating') {
+  if (forceCreating || phase === 'creating') {
     appState.currentState = STATES.SHIFT_CREATING;
   } else if (phase === 'confirmed') {
-    appState.currentState = STATES.SHIFT_CONFIRMED;
+    // confirmedフェーズはSHIFT_CREATINGのままで割当確定可能
+    appState.currentState = STATES.SHIFT_CREATING;
   } else if (phase === 'published') {
-    appState.currentState = STATES.SHIFT_PUBLISHED;
+    appState.currentState = STATES.SHIFT_CREATING;
   }
   updateGuideOnStateChange();
   window.scrollTo({ top: 0, behavior: 'smooth' });
