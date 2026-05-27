@@ -727,17 +727,73 @@ function buildView(state) {
   }
 
   // ─── シフト公開済 ───────────────────────────
+  // この画面はアルバイトが自分の確定シフトを確認する画面。
+  // 店長・管理者はシフト公開後にこの状態にはならない。
   if (state === STATES.SHIFT_PUBLISHED) {
+    const role = appState.currentRole;
+
+    // 店長・管理者がここに来た場合（デモジャンプ等）は案内を出す
+    if (role === ROLES.MANAGER || role === ROLES.ADMIN) {
+      return `
+        <div class="view-card">
+          <h2 class="view-title"><i class="ti ti-eye"></i> シフト公開済</h2>
+          ${staffChip(st)}
+          <div class="badge-success-lg">✓ スタッフへ公開完了</div>
+          <p class="view-desc">アルバイトスタッフが各自のシフトを確認できる状態です。</p>
+          <div class="info-row">
+            <span class="info-label">公開対象店舗</span>
+            <span>${st?.store || '—'}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">確定シフト件数</span>
+            <span>${(DEMO.confirmedShifts || []).filter(c => {
+              const s2 = DEMO.staff.find(s => s.id === c.staffId);
+              return s2?.store === st?.store;
+            }).length}件</span>
+          </div>
+          <p class="hint">次のステップ：欠勤申請の受付・代替募集の管理</p>
+        </div>`;
+    }
+
+    // アルバイト：自分宛の確定シフトを表示
+    const myConfirmed = (DEMO.confirmedShifts || []).filter(c => c.staffId === st?.id);
+
+    const DOW = ['日','月','火','水','木','金','土'];
+    const rows = myConfirmed
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(c => {
+        const d = new Date(c.date);
+        const label = `${c.date.slice(5).replace('-','/')}(${DOW[d.getDay()]})`;
+        return `<div class="shift-row">
+          <span>${label}</span>
+          <span>${c.start}〜${c.end}</span>
+          <span>${st?.store || '—'}</span>
+        </div>`;
+      });
+
+    const noShift = rows.length === 0
+      ? `<div class="warn-box"><i class="ti ti-info-circle"></i> まだ確定シフトがありません。店長にご確認ください。</div>`
+      : '';
+
     return `
       <div class="view-card">
         <h2 class="view-title"><i class="ti ti-eye"></i> 確定シフト確認</h2>
         ${staffChip(st)}
-        <div class="shift-table">
-          <div class="shift-row header"><span>日付</span><span>時間</span><span>店舗</span></div>
-          <div class="shift-row"><span>8/1(月)</span><span>10:00〜18:00</span><span>${st?.store || '渋谷店'}</span></div>
-          <div class="shift-row"><span>8/3(水)</span><span>13:00〜21:00</span><span>${st?.store || '渋谷店'}</span></div>
+        <div class="info-row">
+          <span class="info-label">対象月</span><span>2025年8月</span>
         </div>
-        <button class="btn-warn" id="btn-absence-apply">欠勤申請する</button>
+        <div class="info-row">
+          <span class="info-label">確定件数</span>
+          <span class="${rows.length > 0 ? 'badge-ok' : 'badge-warn'}">${rows.length}件</span>
+        </div>
+        ${noShift}
+        ${rows.length > 0 ? `
+        <div class="shift-table" style="margin-top:8px">
+          <div class="shift-row header"><span>日付</span><span>時間</span><span>店舗</span></div>
+          ${rows.join('')}
+        </div>` : ''}
+        ${rows.length > 0 ? '<button class="btn-warn" id="btn-absence-apply">この中から欠勤申請する</button>' : ''}
+        <p class="hint">シフトに問題がある場合は店長に連絡してください。</p>
       </div>`;
   }
 
