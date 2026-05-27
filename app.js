@@ -791,12 +791,23 @@ function buildView(state) {
             <span>${st?.store || '—'}</span>
           </div>
           <div class="info-row">
-            <span class="info-label">確定シフト件数</span>
-            <span>${(DEMO.confirmedShifts || []).filter(c => {
+            <span class="info-label">公開シフト件数</span>
+            <span class="badge-ok">${(DEMO.confirmedShifts || []).filter(c => {
               const s2 = DEMO.staff.find(s => s.id === c.staffId);
               return s2?.store === st?.store;
             }).length}件</span>
           </div>
+          <div class="info-row">
+            <span class="info-label">対象スタッフ数</span>
+            <span>${new Set((DEMO.confirmedShifts || []).filter(c => {
+              const s2 = DEMO.staff.find(s => s.id === c.staffId);
+              return s2?.store === st?.store;
+            }).map(c => c.staffId)).size}名</span>
+          </div>
+          ${(DEMO.confirmedShifts || []).filter(c => {
+            const s2 = DEMO.staff.find(s => s.id === c.staffId);
+            return s2?.store === st?.store;
+          }).length === 0 ? '<div class="warn-box"><i class="ti ti-alert-triangle"></i> シフト作成画面で「割当確定」ボタンを押してから公開してください</div>' : ''}
           <p class="hint">次のステップ：欠勤申請の受付・代替募集の管理</p>
         </div>`;
     }
@@ -1114,7 +1125,18 @@ function bindViewEvents() {
   on('btn-shift-submit', 'click', () => transition('SHIFT_REQUEST_SUBMIT'));
   on('btn-shift-draft',  'click', () => { transition('SHIFT_SAVE'); showToast('一時保存しました'); });
   on('btn-shift-confirm','click', () => transition('SHIFT_CONFIRM'));
-  on('btn-shift-publish','click', () => transition('SHIFT_PUBLISH'));
+  on('btn-shift-publish','click', () => {
+    const store = appState.currentStaff?.store;
+    const count = (DEMO.confirmedShifts || []).filter(c => {
+      const s = DEMO.staff.find(s => s.id === c.staffId);
+      return s?.store === store;
+    }).length;
+    if (count === 0) {
+      showError('シフト作成画面で「割当確定」を1件以上押してから公開してください');
+      return;
+    }
+    transition('SHIFT_PUBLISH');
+  });
 
   // 欠勤
   on('btn-absence-apply','click', () => transition('ABSENCE_APPLY'));
