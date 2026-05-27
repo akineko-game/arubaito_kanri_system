@@ -628,7 +628,7 @@ function buildView(state) {
   if (state === STATES.SHIFT_REQ_PENDING) {
     const myReqs = DEMO.shiftRequests.filter(r => r.staffId === st?.id);
     const reqRows = myReqs.length
-      ? myReqs.map(r => `<div class="shift-row"><span>${r.date}</span><span>${r.start}</span><span>${r.end}</span><span class="badge-ok">登録済</span></div>`).join('')
+      ? myReqs.map(r => `<div class="shift-row"><span>${r.date}</span><span>${r.start}</span><span>${r.end}</span><span class="badge-warn">希望済</span></div>`).join('')
       : `<div class="shift-row" style="color:var(--color-text-3)"><span colspan="4">まだ登録なし</span></div>`;
     return `
       <div class="view-card">
@@ -664,9 +664,13 @@ function buildView(state) {
         <div class="badge-success-lg">✓ 提出完了</div>
         <div class="shift-table" style="margin-top:8px">
           <div class="shift-row header"><span>希望日</span><span>開始</span><span>終了</span><span></span></div>
-          ${myReqs.map(r => `<div class="shift-row"><span>${r.date}</span><span>${r.start}</span><span>${r.end}</span><span class="badge-ok">✓</span></div>`).join('') || '<div class="shift-row"><span style="color:var(--color-text-3)">データなし</span></div>'}
+          ${myReqs.map(r => `<div class="shift-row"><span>${r.date}</span><span>${r.start}</span><span>${r.end}</span><span class="badge-warn">希望済</span></div>`).join('') || '<div class="shift-row"><span style="color:var(--color-text-3)">データなし</span></div>'}
         </div>
-        <p class="hint">店長がシフトを作成中です。公開後にお知らせします。</p>
+        <div class="info-row" style="font-size:13px;color:var(--color-text-2);margin-top:4px">
+          <i class="ti ti-info-circle" style="color:var(--color-primary);margin-right:4px"></i>
+          「希望済」は勤務希望として提出済みの状態です。店長がシフトに割り当てて公開して初めて「確定シフト」になります。
+        </div>
+        <p class="hint">公開後に「シフト確認」から確定シフトをご確認ください。</p>
       </div>`;
   }
 
@@ -832,6 +836,11 @@ function buildView(state) {
         </div>`;
       });
 
+    // 希望済み（未確定）の一覧も表示して状況を分かりやすくする
+    const myPending = DEMO.shiftRequests.filter(r => r.staffId === st?.id);
+    const confirmedDates = new Set(myConfirmed.map(c => c.date));
+    const pendingOnly = myPending.filter(r => !confirmedDates.has(r.date));
+
     const noShift = rows.length === 0
       ? storePhase === 'published'
         ? `<div class="warn-box"><i class="ti ti-info-circle"></i> あなたの担当シフトはまだ割り当てられていません。店長にご確認ください。</div>`
@@ -858,7 +867,25 @@ function buildView(state) {
           ${rows.join('')}
         </div>` : ''}
         ${rows.length > 0 ? '<button class="btn-warn" id="btn-absence-apply">この中から欠勤申請する</button>' : ''}
-        <p class="hint">シフトに問題がある場合は店長に連絡してください。</p>
+        ${pendingOnly.length > 0 ? `
+        <div style="margin-top:16px">
+          <div style="font-size:12px;font-weight:600;color:var(--color-text-3);letter-spacing:0.05em;text-transform:uppercase;margin-bottom:8px">
+            希望済み・未確定（店長が割り当て次第ここに追加されます）
+          </div>
+          <div class="shift-table">
+            <div class="shift-row header"><span>日付</span><span>希望時間</span><span>状態</span></div>
+            ${pendingOnly.sort((a,b)=>a.date.localeCompare(b.date)).map(r => {
+              const d = new Date(r.date);
+              const DOW2 = ['日','月','火','水','木','金','土'];
+              return `<div class="shift-row">
+                <span>${r.date.slice(5).replace('-','/')}(${DOW2[d.getDay()]})</span>
+                <span>${r.start}〜${r.end}</span>
+                <span class="badge-warn">希望済</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>` : ''}
+        <p class="hint">「確定シフト」＝店長が割り当て・公開した正式なシフトです。「希望済」は店長待ちの状態です。</p>
       </div>`;
   }
 
