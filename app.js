@@ -880,28 +880,29 @@ function renderStaffList() {
   const container = document.getElementById('staff-list-panel');
   if (!container) return;
 
-  const stores = [...new Set(DEMO.staff.map(s => s.store))].sort();
-  const stateKeys = [...new Set(DEMO.staff.map(s => s.state))].sort();
-
-  /* 権限別ベースフィルタ
-       店長   → 自分の店舗のアルバイトのみ
-       管理者 → 管理者以外の全員（自分も除く）
-  */
   const me   = appState.currentStaff;
   const role = appState.currentRole;
 
+  /* ── 権限別ベースフィルタ ──────────────────────────────
+     店長   → 自分の店舗のアルバイトのみ
+     管理者 → 管理者以外の全員（他の管理者・自分自身は除く）
+     それ以外 → 表示なし（renderStaffListIfAllowedで制御済みだが念のため）
+  ───────────────────────────────────────────────────── */
   const base = DEMO.staff.filter(s => {
     if (role === ROLES.MANAGER) {
-      // 自店舗のアルバイトのみ
       return s.role === ROLES.PART_TIME && s.store === me?.store;
     }
     if (role === ROLES.ADMIN) {
-      // 管理者は除外（自分自身も除く）
-      return s.role !== ROLES.ADMIN;
+      return s.role !== ROLES.ADMIN; // 管理者は全員除外（自分含む）
     }
-    return false; // それ以外は表示しない（念のため）
+    return false;
   });
 
+  // フィルタUIの選択肢は base の範囲内だけ
+  const stores    = [...new Set(base.map(s => s.store))].sort();
+  const stateKeys = [...new Set(base.map(s => s.state))].sort();
+
+  // 絞り込み（staffFilterはbaseの上に重ねる）
   const list = base.filter(s => {
     if (staffFilter.state  !== 'all' && s.state  !== staffFilter.state)  return false;
     if (staffFilter.role   !== 'all' && s.role   !== staffFilter.role)   return false;
@@ -913,8 +914,9 @@ function renderStaffList() {
     return true;
   });
 
+  // 統計も base の範囲内で集計
   const counts = {};
-  DEMO.staff.forEach(s => { counts[s.state] = (counts[s.state] || 0) + 1; });
+  base.forEach(s => { counts[s.state] = (counts[s.state] || 0) + 1; });
   const working  = (counts[STATES.WORKING] || 0) + (counts[STATES.ON_BREAK] || 0);
   const alertCnt = (counts[STATES.ABSENCE_APPLYING] || 0) + (counts[STATES.NOTIFY_FAILED] || 0)
                  + (counts[STATES.OVERTIME_APPLYING] || 0) + (counts[STATES.REPLACEMENT_OPEN] || 0);
