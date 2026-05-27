@@ -766,12 +766,53 @@ function buildView(state) {
 
   // ─── シフト確定済 ───────────────────────────
   if (state === STATES.SHIFT_CONFIRMED) {
+    const myStore  = st?.store;
+    const myPartIds = new Set(
+      DEMO.staff.filter(s => s.role === ROLES.PART_TIME && s.store === myStore).map(s => s.id)
+    );
+    const confirmed = (DEMO.confirmedShifts || []).filter(c => myPartIds.has(c.staffId));
+
+    // 日付・スタッフ別に並べる
+    const DOW = ['日','月','火','水','木','金','土'];
+    const rows = confirmed
+      .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start))
+      .map(c => {
+        const staff2 = DEMO.staff.find(s => s.id === c.staffId);
+        const d      = new Date(c.date);
+        const label  = `${c.date.slice(5).replace('-','/')}(${DOW[d.getDay()]})`;
+        return `<div class="shift-row">
+          <span>${label}</span>
+          <span>${staff2?.name || '—'}</span>
+          <span>${c.start}〜${c.end}</span>
+        </div>`;
+      });
+
+    // 日付別の人数サマリ
+    const byDate = {};
+    confirmed.forEach(c => { byDate[c.date] = (byDate[c.date] || 0) + 1; });
+    const dateCount = Object.keys(byDate).length;
+
     return `
       <div class="view-card">
         <h2 class="view-title"><i class="ti ti-circle-check"></i> シフト確定済</h2>
         ${staffChip(st)}
         <div class="badge-success-lg">✓ シフト確定完了</div>
-        <p class="view-desc">内容を確認の上、スタッフへ公開してください。</p>
+        <div class="info-grid" style="margin-top:8px">
+          <div class="info-card">
+            <div class="info-num">${confirmed.length}</div>
+            <div>確定シフト件数</div>
+          </div>
+          <div class="info-card">
+            <div class="info-num">${new Set(confirmed.map(c=>c.staffId)).size}</div>
+            <div>対象スタッフ数</div>
+          </div>
+        </div>
+        ${rows.length > 0 ? `
+        <div class="shift-table" style="margin-top:12px">
+          <div class="shift-row header"><span>日付</span><span>スタッフ</span><span>時間</span></div>
+          ${rows.join('')}
+        </div>` : '<div class="warn-box" style="margin-top:8px"><i class="ti ti-alert-triangle"></i> まだ割当確定されたシフトがありません。シフト作成画面で「割当確定」を押してください。</div>'}
+        <p class="view-desc" style="margin-top:8px">内容を確認の上、スタッフへ公開してください。</p>
         <button class="btn-primary" id="btn-shift-publish">スタッフへ公開する</button>
       </div>`;
   }
