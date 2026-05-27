@@ -959,14 +959,86 @@ function buildView(state) {
 
   // ─── 代替募集中 ─────────────────────────────
   if (state === STATES.REPLACEMENT_OPEN) {
+    const DOW = ['日','月','火','水','木','金','土'];
+
+    // ─── 自分が募集されている側（欠勤承認済みで代替を探している当人）───
+    if (st?.state === STATES.REPLACEMENT_OPEN || appState.currentStaff?.id === st?.id) {
+      // 自分のshiftRequestsから欠勤対象シフトを特定
+      const myReqs = DEMO.shiftRequests.filter(r => r.staffId === st?.id);
+      const shiftInfo = myReqs.length > 0
+        ? (() => {
+            const r = myReqs[0];
+            const d = new Date(r.date);
+            return `${r.date.slice(5).replace('-','/')}(${DOW[d.getDay()]}) ${r.start}〜${r.end}`;
+          })()
+        : '未定';
+
+      // 同じ店舗で代替応募してきたスタッフ（shiftRequestsで判断）
+      const applicants = DEMO.staff.filter(s =>
+        s.store === st?.store &&
+        s.role === ROLES.PART_TIME &&
+        s.id !== st?.id &&
+        s.state !== STATES.ABSENCE_APPLYING &&
+        s.state !== STATES.REPLACEMENT_OPEN
+      ).slice(0, 3); // デモ用に先頭3名を候補として表示
+
+      return `
+        <div class="view-card">
+          <h2 class="view-title"><i class="ti ti-repeat"></i> 代替募集中（自分のシフト）</h2>
+          ${staffChip(st)}
+          <div class="warn-box"><i class="ti ti-info-circle"></i> あなたの欠勤が承認され、代替スタッフを募集しています</div>
+          <div class="info-row"><span class="info-label">募集シフト</span><span>${shiftInfo}</span></div>
+          <div class="info-row"><span class="info-label">店舗</span><span>${st?.store}</span></div>
+          <div class="info-row"><span class="info-label">締切</span><span class="warn-text">7/31 23:59</span></div>
+          <div class="info-row"><span class="info-label">応募状況</span><span class="badge-warn">募集中</span></div>
+          <p class="hint">店長が代替スタッフを決定次第、通知されます。</p>
+        </div>`;
+    }
+
+    // ─── 応募する側（他のアルバイト）───────────────────────────────
+    // 自分の店舗で REPLACEMENT_OPEN のスタッフを探す
+    const openSlots = DEMO.staff.filter(s =>
+      s.store === st?.store &&
+      s.state === STATES.REPLACEMENT_OPEN &&
+      s.id !== st?.id
+    );
+
+    const slotRows = openSlots.map(absent => {
+      const reqs = DEMO.shiftRequests.filter(r => r.staffId === absent.id);
+      return reqs.map(r => {
+        const d = new Date(r.date);
+        const label = `${r.date.slice(5).replace('-','/')}(${DOW[d.getDay()]})`;
+        return `
+          <div class="approval-row">
+            <div class="approval-info">
+              <span class="approval-name">${label} ${r.start}〜${r.end}</span>
+              <span class="approval-detail">${absent.store} ／ 時給 ¥${absent.hourlyRate || '—'}</span>
+              <span class="approval-note">欠員：${absent.name}さんの代替</span>
+            </div>
+            <div class="approval-btns">
+              <button class="btn-primary btn-apply-slot"
+                onclick="applyReplacement(${absent.id}, '${r.date}')">応募する</button>
+            </div>
+          </div>`;
+      }).join('');
+    }).join('');
+
     return `
       <div class="view-card">
-        <h2 class="view-title"><i class="ti ti-repeat"></i> 代替募集</h2>
+        <h2 class="view-title"><i class="ti ti-repeat"></i> 代替シフト応募</h2>
         ${staffChip(st)}
-        <div class="info-row"><span class="info-label">募集シフト</span><span>8/1(月) 10:00〜18:00</span></div>
-        <div class="info-row"><span class="info-label">締切</span><span class="warn-text">7/31 23:59</span></div>
-        ${st?.hourlyRate ? `<div class="info-row"><span class="info-label">時給</span><span>¥${st.hourlyRate}</span></div>` : ''}
-        <button class="btn-primary" id="btn-replacement-apply">代替応募する</button>
+        <div class="info-row">
+          <span class="info-label">対象店舗</span><span>${st?.store}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">募集中件数</span>
+          <span class="${openSlots.length > 0 ? 'badge-warn' : 'badge-ok'}">${openSlots.length}件</span>
+        </div>
+        ${openSlots.length > 0
+          ? `<div class="approval-list" style="margin-top:8px">${slotRows}</div>`
+          : '<div class="badge-success-lg">現在、代替募集中のシフトはありません</div>'
+        }
+        <p class="hint">応募後、店長が確定します。重複応募はできません。</p>
       </div>`;
   }
 
@@ -1452,7 +1524,7 @@ function renderSidebar() {
         <button class="nav-tab" onclick="jumpToState('欠勤申請中')">
           <i class="ti ti-calendar-x"></i>欠勤申請
         </button>
-        <button class="nav-tab" onclick="jumpToState('代替募集中')">
+        <button class="nav-tab" onclick="showReplacementPanel()">
           <i class="ti ti-repeat"></i>代替応募
         </button>
       </nav>
@@ -1606,6 +1678,45 @@ function gotoShiftPhase() {
   }
   updateGuideOnStateChange();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ─── 代替応募パネル表示（サイドバーボタン用） ─── */
+function showReplacementPanel() {
+  const me = appState.currentStaff;
+  if (!me) return;
+  // 自分が募集中なら自分の状態画面、そうでなければ応募画面
+  if (me.state === STATES.REPLACEMENT_OPEN) {
+    appState.currentState = STATES.REPLACEMENT_OPEN;
+  } else {
+    // 応募者として見る：currentStateをREPLACEMENT_OPENにすると
+    // buildViewが「応募する側」として表示する
+    appState.currentState = STATES.REPLACEMENT_OPEN;
+  }
+  updateGuideOnStateChange();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ─── 代替応募（アルバイト用） ─── */
+function applyReplacement(absentStaffId, date) {
+  const absent  = DEMO.staff.find(s => s.id === absentStaffId);
+  const me      = appState.currentStaff;
+  if (!absent || !me) return;
+
+  // 応募済みチェック（簡易：noteで管理）
+  if (me.note?.includes('代替応募済')) {
+    showError('すでに応募済みです');
+    return;
+  }
+
+  // 応募記録（デモ：メモに記録）
+  const req = DEMO.shiftRequests.find(r => r.staffId === absentStaffId && r.date === date);
+  const info = req ? `${date} ${req.start}〜${req.end}` : date;
+  Object.assign(me, { note: `代替応募済: ${absent.name}さんの${info}` });
+
+  logT('REPLACEMENT_APPLY', `${me.name} が ${absent.name}（${info}）の代替に応募`);
+  showToast('代替応募しました。店長の確定をお待ちください。');
+  renderMainView();
+  renderStaffListIfAllowed();
 }
 
 /* ─── 残業承認・欠勤承認パネル（店長用） ─── */
