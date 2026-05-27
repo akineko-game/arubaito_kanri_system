@@ -872,3 +872,75 @@ body {
   font-size: 12px;
   color: var(--color-warn);
 }
+
+/* ---- ログイン中スタッフ名（ヘッダー） ---- */
+.state-who {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  background: var(--color-bg);
+  border: 0.5px solid var(--color-border-em);
+  border-radius: 20px;
+  padding: 3px 10px 3px 7px;
+}
+.state-who i { color: var(--color-primary); font-size: 15px; }
+
+/* ---- ガイドカードのスタッフ名 ---- */
+.guide-who {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-active);
+  margin-bottom: 2px;
+}
+
+/* ---- ビュー内スタッフ名チップ ---- */
+.staff-name-chip {
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-active-bg);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+/* ---- スタッフ一覧：アクティブ行 ---- */
+.sl-row-active {
+  background: var(--color-active-bg) !important;
+  border-left: 3px solid var(--color-primary);
+  padding-left: 17px;
+}
+.sl-row-active .sl-name { color: var(--color-primary); }
+
+/* ---- トースト通知 ---- */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--color-text-1);
+  color: var(--color-surface);
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  pointer-events: none;
+  z-index: 2000;
+  white-space: nowrap;
+}
+.toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+/* ---- ヒントインライン ---- */
+.hint-inline {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-text-3);
+}
