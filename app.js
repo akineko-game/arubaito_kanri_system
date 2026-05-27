@@ -249,7 +249,7 @@ function transition(eventName, payload = {}) {
   switch (eventName) {
     case 'LOGIN':              if (!doLogin(payload)) return false; break;
     case 'SHIFT_REQUEST_SUBMIT': doShiftSubmit(payload); break;
-    case 'SHIFT_CONFIRM':        doShiftConfirm(); break;
+    case 'SHIFT_CONFIRM':        if (!doShiftConfirm()) return false; break;
     case 'SHIFT_PUBLISH':        doShiftPublish(); break;
     case 'CLOCK_IN':           doClockin(); break;
     case 'BREAK_START':        doBreakStart(); break;
@@ -306,10 +306,19 @@ function doLogin({ staffId, password }) {
 
 function doShiftConfirm() {
   const store = appState.currentStaff?.store;
+  const count = (DEMO.confirmedShifts || []).filter(c => {
+    const s = DEMO.staff.find(s => s.id === c.staffId);
+    return s?.store === store;
+  }).length;
+  if (count === 0) {
+    showError('割当確定されたシフトが0件です。シフト作成画面で「割当確定」を押してください。');
+    return false;
+  }
   if (store && DEMO.shiftPhase) {
     DEMO.shiftPhase[store] = 'confirmed';
   }
   updateStaff({ note: `${store} 8月シフト確定済み` });
+  return true;
 }
 
 function doShiftPublish() {
@@ -318,6 +327,17 @@ function doShiftPublish() {
     DEMO.shiftPhase[store] = 'published';
   }
   updateStaff({ note: `${store} 8月シフト公開済み` });
+
+  // 公開対象のアルバイト全員の state を SHIFT_PUBLISHED に更新
+  const confirmedIds = new Set((DEMO.confirmedShifts || []).map(c => c.staffId));
+  DEMO.staff.forEach(s => {
+    if (confirmedIds.has(s.id)) {
+      // シフト公開済みに更新（勤務希望提出済み・公開済みなど途中状態も上書き）
+      s.state = STATES.SHIFT_PUBLISHED;
+      s.note  = s.note?.includes('提出') ? `${s.note} → シフト公開済み` : 'シフト公開済み';
+    }
+  });
+  logT('SHIFT_PUBLISH', `${store} のシフトを公開。対象${confirmedIds.size}名`);
 }
 
 function addShiftRequest() {
@@ -767,8 +787,12 @@ function buildView(state) {
   // ─── シフト確定済 ───────────────────────────
   if (state === STATES.SHIFT_CONFIRMED) {
     const myStore  = st?.store;
+    // 管理者は全店舗が見えるが、店長は自分の店舗のみ
     const myPartIds = new Set(
-      DEMO.staff.filter(s => s.role === ROLES.PART_TIME && s.store === myStore).map(s => s.id)
+      DEMO.staff.filter(s =>
+        s.role === ROLES.PART_TIME &&
+        (appState.currentRole === ROLES.ADMIN ? true : s.store === myStore)
+      ).map(s => s.id)
     );
     const confirmed = (DEMO.confirmedShifts || []).filter(c => myPartIds.has(c.staffId));
 
@@ -1923,7 +1947,6 @@ function confirmAttendance(staffId) {
 /* ─── シフト割当確定（シフト作成画面の行ボタン） ─── */
 function confirmShift(date, staffId) {
   if (!DEMO.confirmedShifts) DEMO.confirmedShifts = [];
-  const key = `${date}_${staffId}`;
   const already = DEMO.confirmedShifts.find(c => c.date === date && c.staffId === staffId);
   if (!already) {
     const req = DEMO.shiftRequests.find(r => r.date === date && r.staffId === staffId);
@@ -1932,8 +1955,9 @@ function confirmShift(date, staffId) {
       logT('SHIFT_ASSIGN', `${date} ${DEMO.staff.find(s=>s.id===staffId)?.name || staffId} を割当`);
     }
   }
-  renderMainView(); // 画面だけ再描画（状態は変えない）
+  renderMainView();
   renderStaffListIfAllowed();
+  renderTransitionLog();
 }
 
 /* ─── ログアウト ─── */
