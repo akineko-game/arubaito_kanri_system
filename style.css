@@ -944,3 +944,75 @@ body {
   font-weight: 400;
   color: var(--color-text-3);
 }
+
+/* ============================================================
+   ロールバッジ（ヘッダー）
+   ============================================================ */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1.5px solid transparent;
+}
+
+.role-badge i { font-size: 15px; }
+
+/* 管理者 — 深いパープル */
+.role-admin {
+  background: #eeedfe;
+  color: #3c3489;
+  border-color: #afa9ec;
+}
+@media (prefers-color-scheme: dark) {
+  .role-admin { background: #26215c; color: #cecbf6; border-color: #534ab7; }
+}
+
+/* 店長 — アンバー */
+.role-manager {
+  background: #faeeda;
+  color: #633806;
+  border-color: #ef9f27;
+}
+@media (prefers-color-scheme: dark) {
+  .role-manager { background: #412402; color: #fac775; border-color: #ba7517; }
+}
+
+/* アルバイト — テール */
+.role-part {
+  background: #e1f5ee;
+  color: #04342c;
+  border-color: #1d9e75;
+}
+@media (prefers-color-scheme: dark) {
+  .role-part { background: #04342c; color: #9fe1cb; border-color: #0f6e56; }
+}
+
+/* 未ログイン — グレー */
+.role-none {
+  background: var(--color-bg);
+  color: var(--color-text-3);
+  border-color: var(--color-border-em);
+  font-weight: 500;
+}
+
+/* ── 一覧スコープラベル ── */
+.scope-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-2);
+  background: var(--color-bg);
+  border: 0.5px solid var(--color-border-em);
+  border-radius: 10px;
+  padding: 2px 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.scope-label i { font-size: 13px; }

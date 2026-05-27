@@ -404,13 +404,32 @@ function renderStaffListIfAllowed() {
 function renderStatePanel() {
   const el = document.getElementById('state-panel');
   if (!el) return;
-  const s = appState.currentStaff;
-  const whoHtml = s
-    ? `<span class="state-who"><i class="ti ti-user"></i>${s.name}（${s.store}）</span>`
-    : '';
-  const role = ROLE_LABEL[appState.currentRole] || '—';
-  const sess = appState.sessionExpiry ? `期限 ${appState.sessionExpiry.toLocaleTimeString('ja-JP')}` : 'セッションなし';
-  el.innerHTML = `<div class="state-current">${whoHtml}<span class="state-badge">${appState.currentState}</span><span class="state-meta">${role} | ${sess}</span></div>`;
+  const s    = appState.currentStaff;
+  const role = appState.currentRole;
+
+  if (!role) {
+    // 未ログイン
+    el.innerHTML = `<span class="role-badge role-none"><i class="ti ti-user-off"></i>未ログイン</span>`;
+    return;
+  }
+
+  const ROLE_BADGE = {
+    [ROLES.ADMIN]:      '<span class="role-badge role-admin"><i class="ti ti-shield-check"></i>管理者</span>',
+    [ROLES.MANAGER]:    '<span class="role-badge role-manager"><i class="ti ti-crown"></i>店長</span>',
+    [ROLES.PART_TIME]:  '<span class="role-badge role-part"><i class="ti ti-user"></i>アルバイト</span>',
+  };
+
+  const badge   = ROLE_BADGE[role] || '';
+  const whoHtml = s ? `<span class="state-who"><i class="ti ti-door-enter"></i>${s.name}（${s.store}）</span>` : '';
+  const sess    = appState.sessionExpiry ? `セッション期限 ${appState.sessionExpiry.toLocaleTimeString('ja-JP')}` : '';
+
+  el.innerHTML = `
+    <div class="state-current">
+      ${badge}
+      ${whoHtml}
+      <span class="state-badge">${appState.currentState}</span>
+      ${sess ? `<span class="state-meta">${sess}</span>` : ''}
+    </div>`;
 }
 
 function renderProgressStepper() {
@@ -864,7 +883,26 @@ function renderStaffList() {
   const stores = [...new Set(DEMO.staff.map(s => s.store))].sort();
   const stateKeys = [...new Set(DEMO.staff.map(s => s.state))].sort();
 
-  const list = DEMO.staff.filter(s => {
+  /* 権限別ベースフィルタ
+       店長   → 自分の店舗のアルバイトのみ
+       管理者 → 管理者以外の全員（自分も除く）
+  */
+  const me   = appState.currentStaff;
+  const role = appState.currentRole;
+
+  const base = DEMO.staff.filter(s => {
+    if (role === ROLES.MANAGER) {
+      // 自店舗のアルバイトのみ
+      return s.role === ROLES.PART_TIME && s.store === me?.store;
+    }
+    if (role === ROLES.ADMIN) {
+      // 管理者は除外（自分自身も除く）
+      return s.role !== ROLES.ADMIN;
+    }
+    return false; // それ以外は表示しない（念のため）
+  });
+
+  const list = base.filter(s => {
     if (staffFilter.state  !== 'all' && s.state  !== staffFilter.state)  return false;
     if (staffFilter.role   !== 'all' && s.role   !== staffFilter.role)   return false;
     if (staffFilter.store  !== 'all' && s.store  !== staffFilter.store)  return false;
@@ -883,7 +921,13 @@ function renderStaffList() {
 
   container.innerHTML = `
     <div class="sl-header">
-      <div class="sl-title"><i class="ti ti-users"></i> スタッフ一覧 <span class="sl-count">${DEMO.staff.length}名</span></div>
+      <div class="sl-title">
+        <i class="ti ti-users"></i>
+        ${role === ROLES.MANAGER
+          ? `スタッフ一覧 <span class="scope-label"><i class="ti ti-building-store"></i>${me?.store}のアルバイト</span>`
+          : `スタッフ一覧 <span class="scope-label"><i class="ti ti-world"></i>全店舗（管理者除く）</span>`}
+        <span class="sl-count">${base.length}名</span>
+      </div>
       <div class="sl-stats">
         <span class="sl-stat sl-ok">出勤中 ${working}名</span>
         <span class="sl-stat sl-error">要対応 ${alertCnt}名</span>
@@ -897,18 +941,21 @@ function renderStaffList() {
         <option value="all">全状態</option>
         ${stateKeys.map(s => `<option value="${s}" ${staffFilter.state===s?'selected':''}>${STATE_COLOR[s]?.label||s}</option>`).join('')}
       </select>
+      ${role === ROLES.MANAGER ? '' : `
       <select onchange="staffFilter.role=this.value; renderStaffList()">
         <option value="all">全ロール</option>
-        <option value="${ROLES.ADMIN}"     ${staffFilter.role===ROLES.ADMIN    ?'selected':''}>管理者</option>
         <option value="${ROLES.MANAGER}"   ${staffFilter.role===ROLES.MANAGER  ?'selected':''}>店長</option>
         <option value="${ROLES.PART_TIME}" ${staffFilter.role===ROLES.PART_TIME?'selected':''}>アルバイト</option>
-      </select>
+      </select>`}
       <select onchange="staffFilter.store=this.value; renderStaffList()">
         <option value="all">全店舗</option>
         ${stores.map(s => `<option value="${s}" ${staffFilter.store===s?'selected':''}>${s}</option>`).join('')}
       </select>
     </div>
-    <div class="sl-result-count">${list.length}件表示 — <span style="color:var(--color-primary)">行クリックでそのスタッフとしてログイン</span></div>
+    <div class="sl-result-count">
+      ${list.length}件表示（全${base.length}名中）—
+      <span style="color:var(--color-primary)">行クリックでそのスタッフとしてログイン</span>
+    </div>
     <div class="sl-table">
       <div class="sl-row sl-row-header">
         <span>名前</span><span>ロール</span><span>店舗</span><span>状態</span><span>時給</span><span>打刻</span><span>メモ</span>
