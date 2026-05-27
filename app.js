@@ -379,12 +379,26 @@ function overtimeWarn() {
    レンダリング
 ═══════════════════════════════════════ */
 function updateGuideOnStateChange() {
+  renderSidebar();
   renderStatePanel();
   renderProgressStepper();
   renderGuide();
   renderMainView();
   highlightNextTab();
-  renderStaffList();
+  renderStaffListIfAllowed();
+}
+
+/* スタッフ一覧は店長・管理者のみ表示 */
+function renderStaffListIfAllowed() {
+  const panel = document.getElementById('staff-list-panel');
+  if (!panel) return;
+  const role = appState.currentRole;
+  if (role === ROLES.MANAGER || role === ROLES.ADMIN) {
+    panel.style.display = '';
+    renderStaffList();
+  } else {
+    panel.style.display = 'none';
+  }
 }
 
 function renderStatePanel() {
@@ -436,6 +450,7 @@ function renderMainView() {
 }
 
 function highlightNextTab() {
+  /* renderSidebar() の後に呼ぶので、DOM上のnav-tabが確定している */
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('next-target'));
   const map = {
     [STATES.LOGGED_OUT]:          'tab-login',
@@ -1003,3 +1018,142 @@ function showToast(msg) {
 document.addEventListener('DOMContentLoaded', () => {
   updateGuideOnStateChange();
 });
+
+/* ═══════════════════════════════════════
+   サイドバー描画（ロール別）
+═══════════════════════════════════════ */
+function renderSidebar() {
+  const el = document.getElementById('app-sidebar');
+  if (!el) return;
+  const role = appState.currentRole;
+
+  // ─── 未ログイン ───────────────────────────────
+  if (!role) {
+    el.innerHTML = `
+      <nav class="nav-section">
+        <div class="nav-section-label">メニュー</div>
+        <button class="nav-tab next-target" id="tab-login" onclick="jumpToState('未ログイン')">
+          <i class="ti ti-login"></i>ログイン
+        </button>
+      </nav>`;
+    return;
+  }
+
+  // ─── アルバイト ───────────────────────────────
+  if (role === ROLES.PART_TIME) {
+    el.innerHTML = `
+      <nav class="nav-section">
+        <div class="nav-section-label">マイメニュー</div>
+        <button class="nav-tab" id="tab-shift-req" onclick="jumpToState('勤務希望未提出')">
+          <i class="ti ti-calendar-event"></i>勤務希望
+        </button>
+        <button class="nav-tab" onclick="jumpToState('シフト公開済')">
+          <i class="ti ti-eye"></i>シフト確認
+        </button>
+        <button class="nav-tab" id="tab-attendance" onclick="jumpToState('出勤前')">
+          <i class="ti ti-clock"></i>打刻
+        </button>
+        <button class="nav-tab" onclick="jumpToState('欠勤申請中')">
+          <i class="ti ti-calendar-x"></i>欠勤申請
+        </button>
+        <button class="nav-tab" onclick="jumpToState('代替募集中')">
+          <i class="ti ti-repeat"></i>代替応募
+        </button>
+      </nav>
+      <nav class="nav-section">
+        <div class="nav-section-label">アカウント</div>
+        <button class="nav-tab" onclick="doLogout()">
+          <i class="ti ti-logout"></i>ログアウト
+        </button>
+      </nav>`;
+    return;
+  }
+
+  // ─── 店長 ─────────────────────────────────────
+  if (role === ROLES.MANAGER) {
+    el.innerHTML = `
+      <nav class="nav-section">
+        <div class="nav-section-label">シフト管理</div>
+        <button class="nav-tab" id="tab-shift-mgmt" onclick="jumpToState('シフト作成中')">
+          <i class="ti ti-layout-grid"></i>シフト作成
+        </button>
+        <button class="nav-tab" onclick="jumpToState('シフト確定済')">
+          <i class="ti ti-circle-check"></i>シフト確定・公開
+        </button>
+      </nav>
+      <nav class="nav-section">
+        <div class="nav-section-label">勤怠管理</div>
+        <button class="nav-tab" id="tab-attendance" onclick="jumpToState('勤怠未確定')">
+          <i class="ti ti-clipboard-check"></i>勤怠確認・確定
+        </button>
+        <button class="nav-tab" onclick="jumpToState('残業申請中')">
+          <i class="ti ti-clock-plus"></i>残業承認
+        </button>
+        <button class="nav-tab" onclick="jumpToState('欠勤申請中')">
+          <i class="ti ti-calendar-x"></i>欠勤承認
+        </button>
+      </nav>
+      <nav class="nav-section">
+        <div class="nav-section-label">その他</div>
+        <button class="nav-tab" id="tab-notify" onclick="jumpToState('通知送信失敗')">
+          <i class="ti ti-bell"></i>通知センター
+        </button>
+        <button class="nav-tab" onclick="doLogout()">
+          <i class="ti ti-logout"></i>ログアウト
+        </button>
+      </nav>`;
+    return;
+  }
+
+  // ─── 管理者 ───────────────────────────────────
+  if (role === ROLES.ADMIN) {
+    el.innerHTML = `
+      <nav class="nav-section">
+        <div class="nav-section-label">スタッフ管理</div>
+        <button class="nav-tab" onclick="jumpToState('シフト作成中')">
+          <i class="ti ti-layout-grid"></i>シフト管理
+        </button>
+        <button class="nav-tab" id="tab-attendance" onclick="jumpToState('勤怠未確定')">
+          <i class="ti ti-clipboard-check"></i>勤怠確定
+        </button>
+      </nav>
+      <nav class="nav-section">
+        <div class="nav-section-label">給与・経理</div>
+        <button class="nav-tab" id="tab-salary" onclick="jumpToState('給与未計算')">
+          <i class="ti ti-coin"></i>給与計算
+        </button>
+        <button class="nav-tab" onclick="showToast('Undefined: CSV項目定義')">
+          <i class="ti ti-download"></i>CSV出力
+        </button>
+      </nav>
+      <nav class="nav-section">
+        <div class="nav-section-label">システム</div>
+        <button class="nav-tab" id="tab-notify" onclick="jumpToState('通知送信失敗')">
+          <i class="ti ti-bell"></i>通知センター
+        </button>
+        <button class="nav-tab" onclick="showToast('Undefined: 監査ログUI')">
+          <i class="ti ti-shield"></i>監査ログ
+        </button>
+        <button class="nav-tab" onclick="showToast('Undefined: バックアップ復元方式')">
+          <i class="ti ti-database"></i>バックアップ
+        </button>
+        <button class="nav-tab" onclick="doLogout()">
+          <i class="ti ti-logout"></i>ログアウト
+        </button>
+      </nav>`;
+    return;
+  }
+}
+
+/* ─── ログアウト ─── */
+function doLogout() {
+  appState.currentStaff  = null;
+  appState.currentRole   = null;
+  appState.currentState  = STATES.LOGGED_OUT;
+  appState.sessionExpiry = null;
+  appState.workStart     = null;
+  appState.breakStart    = null;
+  logT('LOGOUT', 'ログアウトしました');
+  updateGuideOnStateChange();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
