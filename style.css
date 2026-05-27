@@ -1016,3 +1016,21 @@ body {
   vertical-align: middle;
 }
 .scope-label i { font-size: 13px; }
+
+/* ---- シフト割当ボタン ---- */
+.btn-assign {
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 0.5px solid var(--color-border-em);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: all 0.12s;
+  font-family: inherit;
+}
+.btn-assign:hover {
+  background: var(--color-active-bg);
+  border-color: var(--color-primary);
+}

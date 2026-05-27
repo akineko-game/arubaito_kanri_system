@@ -119,12 +119,71 @@ const DEMO = {
     { id: 50, name: '坂本 ひな',   role: ROLES.PART_TIME,  state: STATES.LOGGED_OUT,          store: '渋谷店', age: 23, hourlyRate: 1180, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '産休明け復帰予定' },
   ],
   shiftRequests: [
-    { staffId:  7, date: '2025-08-01', start: '10:00', end: '18:00' },
+    // 渋谷店アルバイト（店長・管理者のシフト作成対象）
+    { staffId:  7, date: '2025-08-01', start: '10:00', end: '18:00' },  // 田中 花子
     { staffId:  7, date: '2025-08-03', start: '13:00', end: '21:00' },
-    { staffId: 12, date: '2025-08-02', start: '10:00', end: '18:00' },
-    { staffId: 13, date: '2025-08-01', start: '10:00', end: '16:00' },
-    { staffId: 14, date: '2025-08-02', start: '09:00', end: '17:00' },
+    { staffId:  7, date: '2025-08-05', start: '10:00', end: '18:00' },
+    { staffId: 10, date: '2025-08-01', start: '13:00', end: '21:00' },  // 加藤 健太
+    { staffId: 10, date: '2025-08-02', start: '10:00', end: '18:00' },
+    { staffId: 10, date: '2025-08-04', start: '10:00', end: '18:00' },
+    { staffId: 12, date: '2025-08-02', start: '10:00', end: '18:00' },  // 山本 勇気
+    { staffId: 12, date: '2025-08-03', start: '10:00', end: '18:00' },
+    { staffId: 15, date: '2025-08-01', start: '18:00', end: '22:00' },  // 木村 蓮
+    { staffId: 15, date: '2025-08-04', start: '13:00', end: '21:00' },
+    { staffId: 16, date: '2025-08-02', start: '10:00', end: '16:00' },  // 林 奈々
+    { staffId: 16, date: '2025-08-05', start: '13:00', end: '21:00' },
+    { staffId: 19, date: '2025-08-01', start: '13:00', end: '18:00' },  // 森 悠斗
+    { staffId: 19, date: '2025-08-03', start: '10:00', end: '18:00' },
+    { staffId: 22, date: '2025-08-02', start: '09:00', end: '17:00' },  // 阿部 千夏
+    { staffId: 22, date: '2025-08-04', start: '09:00', end: '17:00' },
+    { staffId: 25, date: '2025-08-01', start: '17:00', end: '22:00' },  // 藤田 蒼
+    { staffId: 25, date: '2025-08-03', start: '17:00', end: '22:00' },
+    { staffId: 27, date: '2025-08-02', start: '08:00', end: '16:00' },  // 後藤 翔平
+    { staffId: 27, date: '2025-08-05', start: '08:00', end: '16:00' },
+    { staffId: 28, date: '2025-08-01', start: '10:00', end: '18:00' },  // 長谷川 葵
+    { staffId: 28, date: '2025-08-04', start: '13:00', end: '21:00' },
+    { staffId: 31, date: '2025-08-02', start: '10:00', end: '18:00' },  // 藤井 結月
+    { staffId: 31, date: '2025-08-05', start: '13:00', end: '21:00' },
+    { staffId: 33, date: '2025-08-03', start: '10:00', end: '18:00' },  // 福田 ひより
+    { staffId: 36, date: '2025-08-02', start: '13:00', end: '21:00' },  // 青木 陸
+    { staffId: 36, date: '2025-08-04', start: '10:00', end: '18:00' },
+    { staffId: 38, date: '2025-08-01', start: '10:00', end: '18:00' },  // 金子 海斗
+    { staffId: 38, date: '2025-08-05', start: '10:00', end: '18:00' },
+    { staffId: 41, date: '2025-08-02', start: '17:00', end: '23:00' },  // 斎藤 えみか
+    { staffId: 41, date: '2025-08-04', start: '17:00', end: '23:00' },
+    { staffId: 43, date: '2025-08-03', start: '10:00', end: '18:00' },  // 内田 朱音
+    { staffId: 43, date: '2025-08-05', start: '10:00', end: '18:00' },
+    { staffId: 46, date: '2025-08-01', start: '10:00', end: '19:00' },  // 原田 悠真
+    { staffId: 46, date: '2025-08-03', start: '10:00', end: '19:00' },
+    { staffId: 47, date: '2025-08-02', start: '10:00', end: '18:00' },  // 松田 柊
+    { staffId: 47, date: '2025-08-04', start: '13:00', end: '21:00' },
+    { staffId: 50, date: '2025-08-03', start: '10:00', end: '16:00' },  // 坂本 ひな
+    // 新宿店アルバイト（新宿店長用）
+    { staffId:  8, date: '2025-08-01', start: '10:00', end: '18:00' },  // 中村 拓也
+    { staffId: 11, date: '2025-08-02', start: '13:00', end: '21:00' },  // 吉田 あおい
+    { staffId: 14, date: '2025-08-02', start: '09:00', end: '17:00' },  // 井上 彩花
+    { staffId: 17, date: '2025-08-01', start: '10:00', end: '18:00' },  // 清水 航
+    { staffId: 23, date: '2025-08-03', start: '10:00', end: '18:00' },  // 石川 大翔
+    { staffId: 26, date: '2025-08-02', start: '18:00', end: '23:00' },  // 岡田 里奈
+    { staffId: 35, date: '2025-08-01', start: '13:00', end: '21:00' },  // 遠藤 菜々美
+    { staffId: 39, date: '2025-08-04', start: '13:00', end: '21:00' },  // 工藤 美羽
+    { staffId: 42, date: '2025-08-02', start: '08:00', end: '16:00' },  // 横山 蓮太
+    { staffId: 45, date: '2025-08-03', start: '09:00', end: '17:00' },  // 田村 葉月
+    { staffId: 48, date: '2025-08-01', start: '10:00', end: '18:00' },  // 石田 あかり
+    // 池袋店アルバイト
+    { staffId:  9, date: '2025-08-01', start: '10:00', end: '16:00' },  // 小林 さくら
+    { staffId: 13, date: '2025-08-03', start: '10:00', end: '16:00' },  // 松本 優
+    { staffId: 18, date: '2025-08-02', start: '13:00', end: '21:00' },  // 山崎 柚子
+    { staffId: 24, date: '2025-08-01', start: '13:00', end: '21:00' },  // 前田 みずき
+    { staffId: 29, date: '2025-08-04', start: '13:00', end: '21:00' },  // 村田 晴菜
+    { staffId: 34, date: '2025-08-02', start: '10:00', end: '18:00' },  // 岡本 亮
+    { staffId: 37, date: '2025-08-03', start: '13:00', end: '21:00' },  // 竹内 ゆか
+    { staffId: 40, date: '2025-08-01', start: '09:00', end: '17:00' },  // 和田 一輝
+    { staffId: 44, date: '2025-08-05', start: '13:00', end: '21:00' },  // 宮崎 大空
+    { staffId: 49, date: '2025-08-02', start: '10:00', end: '18:00' },  // 三浦 朝陽
   ],
+  // 確定済みシフト（SHIFT_PUBLISHED 以降の状態管理用）
+  confirmedShifts: [],
 };
 
 /* ═══════════════════════════════════════
@@ -569,25 +628,89 @@ function buildView(state) {
 
   // ─── シフト作成中 ───────────────────────────
   if (state === STATES.SHIFT_CREATING) {
-    const submitted = DEMO.staff.filter(s => s.state === STATES.SHIFT_REQ_SUBMITTED || s.state !== STATES.LOGGED_OUT).length;
+    const myStore = st?.store;
+
+    // この店舗のアルバイトIDセット
+    const myPartIds = new Set(
+      DEMO.staff.filter(s => s.role === ROLES.PART_TIME && s.store === myStore).map(s => s.id)
+    );
+
+    // この店舗のアルバイトの勤務希望を取得
+    const storeReqs = DEMO.shiftRequests.filter(r => myPartIds.has(r.staffId));
+
+    // 提出済みスタッフ数（重複なし）
+    const submittedStaffIds = [...new Set(storeReqs.map(r => r.staffId))];
+    const submittedCount = submittedStaffIds.length;
+    const totalPart = myPartIds.size;
+
+    // 日付別に集計（ソート）
+    const byDate = {};
+    storeReqs.forEach(r => {
+      if (!byDate[r.date]) byDate[r.date] = [];
+      byDate[r.date].push(r);
+    });
+    const sortedDates = Object.keys(byDate).sort();
+
+    // 確定済みシフト（staffIdごとに1件確定）— confirmedShiftsから取得
+    const confirmed = new Set((DEMO.confirmedShifts || []).map(c => `${c.date}_${c.staffId}`));
+
+    // 各希望をシフト行に変換
+    const shiftRows = sortedDates.flatMap(date => {
+      const reqs = byDate[date];
+      // 日付の曜日
+      const d = new Date(date);
+      const DOW = ['日','月','火','水','木','金','土'];
+      const label = `${date.slice(5).replace('-','/')}(${DOW[d.getDay()]})`;
+      return reqs.map(r => {
+        const staff = DEMO.staff.find(s => s.id === r.staffId);
+        const key = `${date}_${r.staffId}`;
+        const isConfirmed = confirmed.has(key);
+        const badge = isConfirmed
+          ? '<span class="badge-ok">確定済</span>'
+          : '<button class="btn-assign" onclick="confirmShift(\''+date+'\','+r.staffId+')">割当確定</button>';
+        return `<div class="shift-row">
+          <span>${label}</span>
+          <span>${staff?.name || '—'}</span>
+          <span>${r.start}〜${r.end}</span>
+          <span>${badge}</span>
+        </div>`;
+      });
+    });
+
+    const confirmedCount = (DEMO.confirmedShifts || []).filter(c =>
+      myPartIds.has(c.staffId)
+    ).length;
+    const unassigned = storeReqs.length - confirmedCount;
+
     return `
       <div class="view-card">
         <h2 class="view-title"><i class="ti ti-layout-grid"></i> シフト作成</h2>
         ${staffChip(st)}
         <div class="info-grid">
-          <div class="info-card"><div class="info-num">${submitted}</div><div>提出済みスタッフ</div></div>
-          <div class="info-card warn"><div class="info-num">3</div><div>不足時間帯</div></div>
+          <div class="info-card">
+            <div class="info-num">${submittedCount}</div>
+            <div>提出済みスタッフ（全${totalPart}名中）</div>
+          </div>
+          <div class="info-card ${unassigned > 0 ? 'warn' : ''}">
+            <div class="info-num">${unassigned}</div>
+            <div>未割当シフト</div>
+          </div>
         </div>
-        <div class="shift-table">
-          <div class="shift-row header"><span>日付</span><span>スタッフ</span><span>時間</span><span>状態</span></div>
-          <div class="shift-row"><span>8/1(月)</span><span>田中 花子</span><span>10:00〜18:00</span><span class="badge-ok">割当済</span></div>
-          <div class="shift-row"><span>8/2(火)</span><span>—</span><span>13:00〜21:00</span><span class="badge-warn">未割当</span></div>
-          <div class="shift-row"><span>8/3(水)</span><span>—</span><span>10:00〜18:00</span><span class="badge-warn">未割当</span></div>
+        <div class="info-row" style="font-size:13px">
+          <span class="info-label">勤務希望総数</span><span>${storeReqs.length}件</span>
         </div>
-        <div class="btn-row">
+        <div class="info-row" style="font-size:13px">
+          <span class="info-label">割当確定済</span><span>${confirmedCount}件</span>
+        </div>
+        <div class="shift-table" style="margin-top:12px">
+          <div class="shift-row header"><span>日付</span><span>スタッフ</span><span>時間</span><span>操作</span></div>
+          ${shiftRows.length > 0 ? shiftRows.join('') : '<div class="shift-row"><span style="color:var(--color-text-3)">勤務希望なし</span></div>'}
+        </div>
+        <div class="btn-row" style="margin-top:12px">
           <button class="btn-secondary" id="btn-shift-draft">一時保存</button>
-          <button class="btn-primary"   id="btn-shift-confirm">シフトを確定する</button>
+          <button class="btn-primary"   id="btn-shift-confirm" ${unassigned > 0 ? '' : ''}>シフトを確定する</button>
         </div>
+        ${unassigned > 0 ? '<p class="hint warn-text">⚠ まだ未割当のシフトがあります</p>' : '<p class="hint" style="color:var(--color-ok)">✓ 全シフト割当済みです</p>'}
       </div>`;
   }
 
@@ -1229,6 +1352,22 @@ function jumpToMyWork() {
     updateGuideOnStateChange();
   }
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ─── シフト割当確定（シフト作成画面の行ボタン） ─── */
+function confirmShift(date, staffId) {
+  if (!DEMO.confirmedShifts) DEMO.confirmedShifts = [];
+  const key = `${date}_${staffId}`;
+  const already = DEMO.confirmedShifts.find(c => c.date === date && c.staffId === staffId);
+  if (!already) {
+    const req = DEMO.shiftRequests.find(r => r.date === date && r.staffId === staffId);
+    if (req) {
+      DEMO.confirmedShifts.push({ date, staffId, start: req.start, end: req.end });
+      logT('SHIFT_ASSIGN', `${date} ${DEMO.staff.find(s=>s.id===staffId)?.name || staffId} を割当`);
+    }
+  }
+  renderMainView(); // 画面だけ再描画（状態は変えない）
+  renderStaffListIfAllowed();
 }
 
 /* ─── ログアウト ─── */
