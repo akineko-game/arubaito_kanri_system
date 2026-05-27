@@ -182,8 +182,14 @@ const DEMO = {
     { staffId: 44, date: '2025-08-05', start: '13:00', end: '21:00' },  // 宮崎 大空
     { staffId: 49, date: '2025-08-02', start: '10:00', end: '18:00' },  // 三浦 朝陽
   ],
-  // 確定済みシフト（SHIFT_PUBLISHED 以降の状態管理用）
+  // 確定済みシフト（割当確定ボタンで追加）
   confirmedShifts: [],
+  // 店舗ごとのシフトフェーズ（creating → confirmed → published）
+  shiftPhase: {
+    '渋谷店': 'creating',
+    '新宿店': 'creating',
+    '池袋店': 'creating',
+  },
 };
 
 /* ═══════════════════════════════════════
@@ -243,6 +249,8 @@ function transition(eventName, payload = {}) {
   switch (eventName) {
     case 'LOGIN':              if (!doLogin(payload)) return false; break;
     case 'SHIFT_REQUEST_SUBMIT': doShiftSubmit(payload); break;
+    case 'SHIFT_CONFIRM':        doShiftConfirm(); break;
+    case 'SHIFT_PUBLISH':        doShiftPublish(); break;
     case 'CLOCK_IN':           doClockin(); break;
     case 'BREAK_START':        doBreakStart(); break;
     case 'BREAK_END':          doBreakEnd(); break;
@@ -294,6 +302,22 @@ function doLogin({ staffId, password }) {
   // → transition() 内で currentState を上書きする前に state を保存
   appState._loginTargetState = staff.state !== STATES.LOGGED_OUT ? staff.state : null;
   return true;
+}
+
+function doShiftConfirm() {
+  const store = appState.currentStaff?.store;
+  if (store && DEMO.shiftPhase) {
+    DEMO.shiftPhase[store] = 'confirmed';
+  }
+  updateStaff({ note: `${store} 8月シフト確定済み` });
+}
+
+function doShiftPublish() {
+  const store = appState.currentStaff?.store;
+  if (store && DEMO.shiftPhase) {
+    DEMO.shiftPhase[store] = 'published';
+  }
+  updateStaff({ note: `${store} 8月シフト公開済み` });
 }
 
 function doShiftSubmit(payload) {
@@ -680,37 +704,39 @@ function buildView(state) {
     const confirmedCount = (DEMO.confirmedShifts || []).filter(c =>
       myPartIds.has(c.staffId)
     ).length;
-    const unassigned = storeReqs.length - confirmedCount;
+    const phase = DEMO.shiftPhase?.[myStore] || 'creating';
+    const isConfirmedPhase = phase === 'confirmed' || phase === 'published';
 
     return `
       <div class="view-card">
         <h2 class="view-title"><i class="ti ti-layout-grid"></i> シフト作成</h2>
         ${staffChip(st)}
+        ${isConfirmedPhase ? `<div class="badge-success-lg">✓ シフト${phase === 'published' ? '公開済み' : '確定済み'}</div>` : ''}
         <div class="info-grid">
           <div class="info-card">
             <div class="info-num">${submittedCount}</div>
             <div>提出済みスタッフ（全${totalPart}名中）</div>
           </div>
-          <div class="info-card ${unassigned > 0 ? 'warn' : ''}">
-            <div class="info-num">${unassigned}</div>
-            <div>未割当シフト</div>
+          <div class="info-card ${confirmedCount > 0 ? '' : 'warn'}">
+            <div class="info-num">${confirmedCount} <span style="font-size:16px;font-weight:400">/ ${storeReqs.length}</span></div>
+            <div>割当確定件数</div>
           </div>
-        </div>
-        <div class="info-row" style="font-size:13px">
-          <span class="info-label">勤務希望総数</span><span>${storeReqs.length}件</span>
-        </div>
-        <div class="info-row" style="font-size:13px">
-          <span class="info-label">割当確定済</span><span>${confirmedCount}件</span>
         </div>
         <div class="shift-table" style="margin-top:12px">
           <div class="shift-row header"><span>日付</span><span>スタッフ</span><span>時間</span><span>操作</span></div>
           ${shiftRows.length > 0 ? shiftRows.join('') : '<div class="shift-row"><span style="color:var(--color-text-3)">勤務希望なし</span></div>'}
         </div>
+        ${!isConfirmedPhase ? `
         <div class="btn-row" style="margin-top:12px">
           <button class="btn-secondary" id="btn-shift-draft">一時保存</button>
-          <button class="btn-primary"   id="btn-shift-confirm" ${unassigned > 0 ? '' : ''}>シフトを確定する</button>
+          <button class="btn-primary"   id="btn-shift-confirm">シフトを確定する</button>
         </div>
-        ${unassigned > 0 ? '<p class="hint warn-text">⚠ まだ未割当のシフトがあります</p>' : '<p class="hint" style="color:var(--color-ok)">✓ 全シフト割当済みです</p>'}
+        <p class="hint">割当確定した行だけが公式シフトになります。全員を入れる必要はありません。</p>
+        ` : phase === 'confirmed' ? `
+        <button class="btn-primary" id="btn-shift-publish" style="margin-top:12px">スタッフへ公開する</button>
+        ` : `
+        <p class="hint" style="color:var(--color-ok);margin-top:8px">✓ スタッフへ公開済みです</p>
+        `}
       </div>`;
   }
 
@@ -907,6 +933,78 @@ function buildView(state) {
 
   // ─── 勤怠未確定 ─────────────────────────────
   if (state === STATES.ATTENDANCE_PENDING) {
+    const role = appState.currentRole;
+
+    // ─── 店長・管理者：部下の勤怠一覧を確認・確定 ───────────────
+    if (role === ROLES.MANAGER || role === ROLES.ADMIN) {
+      const myStore = st?.store;
+
+      // 対象スタッフ（店長→自店舗アルバイト / 管理者→管理者以外全員）
+      const targets = DEMO.staff.filter(s => {
+        if (role === ROLES.MANAGER) return s.role === ROLES.PART_TIME && s.store === myStore;
+        return s.role !== ROLES.ADMIN;
+      });
+
+      const pending  = targets.filter(s => s.state === STATES.ATTENDANCE_PENDING);
+      const done     = targets.filter(s => s.state === STATES.SALARY_PENDING);
+
+      const pendingRows = pending.map(s => {
+        const wm = calcWorkMin(s);
+        const est = s.hourlyRate && wm > 0 ? `¥${Math.round(s.hourlyRate * wm / 60).toLocaleString()}` : '—';
+        return `
+          <div class="approval-row">
+            <div class="approval-info">
+              <span class="approval-name">${s.name} <span class="sl-role">${s.store}</span></span>
+              <span class="approval-detail">
+                出勤 ${s.clockIn || '—'} → 退勤 ${s.clockOut || '—'}
+                ／ 休憩 ${s.breakMin || 0}分 ／ 実働 ${wm > 0 ? fmtMinutes(wm) : '—'}
+              </span>
+              <span class="approval-detail">概算 ${est}${s.overtimeMin > 0 ? ' ／ 残業 ' + s.overtimeMin + '分' : ''}</span>
+            </div>
+            <div class="approval-btns">
+              <button class="btn-primary" onclick="confirmAttendance(${s.id})">確定</button>
+            </div>
+          </div>`;
+      });
+
+      const doneRows = done.map(s => {
+        const wm = calcWorkMin(s);
+        return `
+          <div class="approval-row" style="opacity:0.6">
+            <div class="approval-info">
+              <span class="approval-name">${s.name} <span class="badge-ok" style="font-size:11px;padding:1px 7px">確定済</span></span>
+              <span class="approval-detail">実働 ${wm > 0 ? fmtMinutes(wm) : '—'}</span>
+            </div>
+          </div>`;
+      });
+
+      return `
+        <div class="view-card">
+          <h2 class="view-title"><i class="ti ti-clipboard-check"></i> 勤怠確認・確定</h2>
+          ${staffChip(st)}
+          <div class="info-grid">
+            <div class="info-card warn">
+              <div class="info-num">${pending.length}</div>
+              <div>未確定</div>
+            </div>
+            <div class="info-card">
+              <div class="info-num">${done.length}</div>
+              <div>確定済</div>
+            </div>
+          </div>
+          ${pending.length > 0 ? `
+            <div class="approval-list">${pendingRows.join('')}</div>
+            <button class="btn-primary" id="btn-attendance-confirm" style="margin-top:8px">全員まとめて確定</button>
+          ` : `<div class="badge-success-lg">✓ 未確定の勤怠はありません</div>`}
+          ${done.length > 0 ? `
+            <div style="margin-top:12px;font-size:12px;color:var(--color-text-3);font-weight:600;letter-spacing:0.04em;text-transform:uppercase">確定済み</div>
+            <div class="approval-list">${doneRows.join('')}</div>
+          ` : ''}
+          <p class="hint">Undefined: 打刻改ざん対策</p>
+        </div>`;
+    }
+
+    // ─── アルバイト：自分の勤怠を確認 ───────────────────────────
     const workMin = calcWorkMin(st);
     const salEst  = st?.hourlyRate && workMin > 0 ? Math.round(st.hourlyRate * workMin / 60) : null;
     return `
@@ -919,11 +1017,7 @@ function buildView(state) {
         <div class="info-row"><span class="info-label">残業</span><span>${st?.overtimeMin || 0}分</span></div>
         <div class="info-row"><span class="info-label">実働</span><span>${workMin > 0 ? fmtMinutes(workMin) : '—'}</span></div>
         ${salEst ? `<div class="info-row"><span class="info-label">概算給与</span><span class="staff-name-chip">¥${salEst.toLocaleString()}</span></div>` : ''}
-        <div class="btn-row">
-          <button class="btn-secondary" id="btn-attendance-fix">打刻修正</button>
-          <button class="btn-primary"   id="btn-attendance-confirm">勤怠を確定する</button>
-        </div>
-        <p class="hint">Undefined: 打刻改ざん対策</p>
+        <p class="hint">内容に誤りがある場合は店長に連絡してください。Undefined: 打刻改ざん対策</p>
       </div>`;
   }
 
@@ -1020,7 +1114,21 @@ function bindViewEvents() {
 
   // 勤怠
   on('btn-attendance-fix',    'click', () => { transition('ATTENDANCE_FIX'); showToast('Undefined: 打刻修正UI'); });
-  on('btn-attendance-confirm','click', () => transition('ATTENDANCE_CONFIRM'));
+  on('btn-attendance-confirm','click', () => {
+    const role = appState.currentRole;
+    if (role === ROLES.MANAGER || role === ROLES.ADMIN) {
+      // 全員まとめて確定
+      const myStore = appState.currentStaff?.store;
+      const targets = DEMO.staff.filter(s => {
+        if (role === ROLES.MANAGER) return s.role === ROLES.PART_TIME && s.store === myStore && s.state === STATES.ATTENDANCE_PENDING;
+        return s.role !== ROLES.ADMIN && s.state === STATES.ATTENDANCE_PENDING;
+      });
+      targets.forEach(s => confirmAttendance(s.id));
+      showToast(`${targets.length}名の勤怠を確定しました`);
+    } else {
+      transition('ATTENDANCE_CONFIRM');
+    }
+  });
 
   // 給与
   on('btn-salary-calc',       'click', () => { transition('SALARY_CALC'); showToast('給与計算を実行しました'); });
@@ -1181,6 +1289,15 @@ function loginAsStaff(staffId) {
     appState.breakStart = new Date(Date.now() - (staff.breakMin || 10) * 60000);
   }
 
+  // 店長・管理者のシフトフェーズから現在状態を復元
+  if (staff.role === ROLES.MANAGER) {
+    const phase = DEMO.shiftPhase?.[staff.store];
+    if (phase === 'confirmed' && appState.currentState === STATES.SHIFT_CREATING) {
+      appState.currentState = STATES.SHIFT_CONFIRMED;
+    } else if (phase === 'published' && (appState.currentState === STATES.SHIFT_CREATING || appState.currentState === STATES.SHIFT_CONFIRMED)) {
+      appState.currentState = STATES.SHIFT_PUBLISHED;
+    }
+  }
   logT('STAFF_LOGIN', `${staff.name}（${ROLE_LABEL[staff.role]}・${staff.store}）でログイン`);
   updateGuideOnStateChange();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1299,15 +1416,30 @@ function renderSidebar() {
 
   // ─── 店長 ─────────────────────────────────────
   if (role === ROLES.MANAGER) {
+    const store = appState.currentStaff?.store;
+    const phase = DEMO.shiftPhase?.[store] || 'creating';
+    const shiftNavHtml = (() => {
+      if (phase === 'creating') return `
+        <button class="nav-tab next-target" id="tab-shift-mgmt" onclick="gotoShiftPhase()">
+          <i class="ti ti-layout-grid"></i>シフト作成中
+        </button>`;
+      if (phase === 'confirmed') return `
+        <button class="nav-tab done" id="tab-shift-mgmt" onclick="gotoShiftPhase()">
+          <i class="ti ti-layout-grid"></i>シフト作成<span class="tab-badge">確定済</span>
+        </button>
+        <button class="nav-tab next-target" onclick="gotoShiftPhase()">
+          <i class="ti ti-send"></i>シフト公開待ち
+        </button>`;
+      if (phase === 'published') return `
+        <button class="nav-tab done" id="tab-shift-mgmt" onclick="gotoShiftPhase()">
+          <i class="ti ti-layout-grid"></i>シフト管理<span class="tab-badge">公開済</span>
+        </button>`;
+      return '';
+    })();
     el.innerHTML = `
       <nav class="nav-section">
         <div class="nav-section-label">シフト管理</div>
-        <button class="nav-tab" id="tab-shift-mgmt" onclick="jumpToState('シフト作成中')">
-          <i class="ti ti-layout-grid"></i>シフト作成
-        </button>
-        <button class="nav-tab" onclick="jumpToState('シフト確定済')">
-          <i class="ti ti-circle-check"></i>シフト確定・公開
-        </button>
+        ${shiftNavHtml}
       </nav>
       <nav class="nav-section">
         <div class="nav-section-label">自分の勤務</div>
@@ -1320,10 +1452,10 @@ function renderSidebar() {
         <button class="nav-tab" id="tab-attendance" onclick="jumpToState('勤怠未確定')">
           <i class="ti ti-clipboard-check"></i>勤怠確認・確定
         </button>
-        <button class="nav-tab" onclick="jumpToState('残業申請中')">
+        <button class="nav-tab" id="tab-ot-approve" onclick="showApprovalPanel('overtime')">
           <i class="ti ti-clock-plus"></i>残業承認
         </button>
-        <button class="nav-tab" onclick="jumpToState('欠勤申請中')">
+        <button class="nav-tab" id="tab-abs-approve" onclick="showApprovalPanel('absence')">
           <i class="ti ti-calendar-x"></i>欠勤承認
         </button>
       </nav>
@@ -1408,6 +1540,154 @@ function jumpToMyWork() {
     updateGuideOnStateChange();
   }
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ─── シフトフェーズに応じた画面へ（店長用） ─── */
+function gotoShiftPhase() {
+  const store = appState.currentStaff?.store;
+  const phase = DEMO.shiftPhase?.[store] || 'creating';
+  if (phase === 'creating') {
+    appState.currentState = STATES.SHIFT_CREATING;
+  } else if (phase === 'confirmed') {
+    appState.currentState = STATES.SHIFT_CONFIRMED;
+  } else if (phase === 'published') {
+    appState.currentState = STATES.SHIFT_PUBLISHED;
+  }
+  updateGuideOnStateChange();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ─── 残業承認・欠勤承認パネル（店長用） ─── */
+function showApprovalPanel(type) {
+  const me = appState.currentStaff;
+  const mainView = document.getElementById('main-view');
+  if (!mainView) return;
+
+  // この店舗のアルバイトを対象に絞る
+  const targets = DEMO.staff.filter(s =>
+    s.role === ROLES.PART_TIME && s.store === me?.store
+  );
+
+  const DOW = ['日','月','火','水','木','金','土'];
+
+  if (type === 'overtime') {
+    // 残業申請中のアルバイト一覧
+    const applicants = targets.filter(s => s.state === STATES.OVERTIME_APPLYING);
+    const rows = applicants.map(s => `
+      <div class="approval-row">
+        <div class="approval-info">
+          <span class="approval-name">${s.name}</span>
+          <span class="approval-detail">出勤 ${s.clockIn || '—'} ／ 残業 ${s.overtimeMin}分申請</span>
+          <span class="approval-note">${s.note}</span>
+        </div>
+        <div class="approval-btns">
+          <button class="btn-primary" onclick="approveOvertime(${s.id})">承認</button>
+          <button class="btn-warn"    onclick="rejectOvertime(${s.id})">却下</button>
+        </div>
+      </div>`).join('');
+
+    mainView.innerHTML = `
+      <div class="view-card">
+        <h2 class="view-title"><i class="ti ti-clock-plus"></i> 残業承認</h2>
+        <div class="info-row">
+          <span class="info-label">対象店舗</span><span class="staff-name-chip">${me?.store}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">申請中</span>
+          <span class="${applicants.length > 0 ? 'badge-warn' : 'badge-ok'}">${applicants.length}件</span>
+        </div>
+        ${applicants.length > 0
+          ? `<div class="approval-list">${rows}</div>`
+          : '<div class="badge-success-lg">✓ 承認待ちの残業申請はありません</div>'
+        }
+      </div>`;
+
+  } else {
+    // 欠勤申請中のアルバイト一覧
+    const applicants = targets.filter(s => s.state === STATES.ABSENCE_APPLYING);
+    const rows = applicants.map(s => `
+      <div class="approval-row">
+        <div class="approval-info">
+          <span class="approval-name">${s.name}</span>
+          <span class="approval-detail">時給 ¥${s.hourlyRate || '—'} ／ ${s.store}</span>
+          <span class="approval-note">${s.note}</span>
+        </div>
+        <div class="approval-btns">
+          <button class="btn-primary" onclick="approveAbsence(${s.id})">承認</button>
+          <button class="btn-warn"    onclick="rejectAbsence(${s.id})">却下（代替募集へ）</button>
+        </div>
+      </div>`).join('');
+
+    mainView.innerHTML = `
+      <div class="view-card">
+        <h2 class="view-title"><i class="ti ti-calendar-x"></i> 欠勤承認</h2>
+        <div class="info-row">
+          <span class="info-label">対象店舗</span><span class="staff-name-chip">${me?.store}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">申請中</span>
+          <span class="${applicants.length > 0 ? 'badge-error' : 'badge-ok'}">${applicants.length}件</span>
+        </div>
+        ${applicants.length > 0
+          ? `<div class="approval-list">${rows}</div>`
+          : '<div class="badge-success-lg">✓ 承認待ちの欠勤申請はありません</div>'
+        }
+      </div>`;
+  }
+}
+
+function approveOvertime(staffId) {
+  const s = DEMO.staff.find(s => s.id === staffId);
+  if (!s) return;
+  s.state = STATES.WORKING;
+  s.note  = `残業承認済 ${s.overtimeMin}分`;
+  logT('OVERTIME_APPROVE', `${s.name} の残業申請を承認`);
+  showApprovalPanel('overtime');
+  renderStaffListIfAllowed();
+}
+
+function rejectOvertime(staffId) {
+  const s = DEMO.staff.find(s => s.id === staffId);
+  if (!s) return;
+  s.state      = STATES.WORKING;
+  s.overtimeMin = 0;
+  s.note       = '残業却下 → 定時退勤';
+  logT('OVERTIME_REJECT', `${s.name} の残業申請を却下`);
+  showApprovalPanel('overtime');
+  renderStaffListIfAllowed();
+}
+
+function approveAbsence(staffId) {
+  const s = DEMO.staff.find(s => s.id === staffId);
+  if (!s) return;
+  s.state = STATES.REPLACEMENT_OPEN;
+  s.note  = '欠勤承認 → 代替募集中';
+  logT('ABSENCE_APPROVE', `${s.name} の欠勤を承認 → 代替募集へ`);
+  showApprovalPanel('absence');
+  renderStaffListIfAllowed();
+}
+
+function rejectAbsence(staffId) {
+  const s = DEMO.staff.find(s => s.id === staffId);
+  if (!s) return;
+  s.state = STATES.SHIFT_PUBLISHED;
+  s.note  = '欠勤却下 → 出勤必須';
+  logT('ABSENCE_REJECT', `${s.name} の欠勤申請を却下`);
+  showApprovalPanel('absence');
+  renderStaffListIfAllowed();
+}
+
+/* ─── 個別勤怠確定（店長・管理者用） ─── */
+function confirmAttendance(staffId) {
+  const s = DEMO.staff.find(s => s.id === staffId);
+  if (!s) return;
+  const wm = calcWorkMin(s);
+  const est = s.hourlyRate && wm > 0 ? Math.round(s.hourlyRate * wm / 60) : null;
+  s.state = STATES.SALARY_PENDING;
+  s.note  = `勤怠確定 実働${fmtMinutes(wm)}${est ? ' 概算¥' + est.toLocaleString() : ''}`;
+  logT('ATTENDANCE_CONFIRM', `${s.name} の勤怠を確定`);
+  renderMainView();          // 画面を再描画（状態一覧を更新）
+  renderStaffListIfAllowed();
 }
 
 /* ─── シフト割当確定（シフト作成画面の行ボタン） ─── */
