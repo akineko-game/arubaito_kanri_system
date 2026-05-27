@@ -42,10 +42,10 @@ const EVENT_ROUTES = {
   SHIFT_CONFIRM:       { from: [STATES.SHIFT_CREATING],                                to: STATES.SHIFT_CONFIRMED,     roles: [ROLES.MANAGER] },
   SHIFT_PUBLISH:       { from: [STATES.SHIFT_CONFIRMED],                               to: STATES.SHIFT_PUBLISHED,     roles: [ROLES.ADMIN, ROLES.MANAGER] },
   ABSENCE_APPLY:       { from: [STATES.SHIFT_PUBLISHED, STATES.ABSENCE_APPLYING],      to: STATES.ABSENCE_APPLYING,    roles: [ROLES.PART_TIME] },
-  CLOCK_IN:            { from: [STATES.PRE_WORK],                                      to: STATES.WORKING,             roles: [ROLES.PART_TIME] },
-  BREAK_START:         { from: [STATES.WORKING],                                        to: STATES.ON_BREAK,            roles: [ROLES.PART_TIME] },
-  BREAK_END:           { from: [STATES.ON_BREAK],                                       to: STATES.WORKING,             roles: [ROLES.PART_TIME] },
-  CLOCK_OUT:           { from: [STATES.WORKING],                                        to: STATES.ATTENDANCE_PENDING,  roles: [ROLES.PART_TIME, ROLES.MANAGER] },
+  CLOCK_IN:            { from: [STATES.PRE_WORK],                                      to: STATES.WORKING,             roles: [ROLES.PART_TIME, ROLES.MANAGER, ROLES.ADMIN] },
+  BREAK_START:         { from: [STATES.WORKING],                                        to: STATES.ON_BREAK,            roles: [ROLES.PART_TIME, ROLES.MANAGER, ROLES.ADMIN] },
+  BREAK_END:           { from: [STATES.ON_BREAK],                                       to: STATES.WORKING,             roles: [ROLES.PART_TIME, ROLES.MANAGER, ROLES.ADMIN] },
+  CLOCK_OUT:           { from: [STATES.WORKING],                                        to: STATES.ATTENDANCE_PENDING,  roles: [ROLES.PART_TIME, ROLES.MANAGER, ROLES.ADMIN] },
   OVERTIME_APPLY:      { from: [STATES.OVERTIME_APPLYING],                              to: STATES.WORKING,             roles: [ROLES.PART_TIME] },
   ATTENDANCE_FIX:      { from: [STATES.ATTENDANCE_PENDING],                             to: STATES.ATTENDANCE_PENDING,  roles: [ROLES.MANAGER, ROLES.ADMIN] },
   ATTENDANCE_CONFIRM:  { from: [STATES.ATTENDANCE_PENDING],                             to: STATES.SALARY_PENDING,      roles: [ROLES.ADMIN, ROLES.MANAGER] },
@@ -1082,6 +1082,12 @@ function renderSidebar() {
         </button>
       </nav>
       <nav class="nav-section">
+        <div class="nav-section-label">自分の勤務</div>
+        <button class="nav-tab" id="tab-my-clock" onclick="jumpToMyWork()">
+          <i class="ti ti-clock"></i>打刻（自分）
+        </button>
+      </nav>
+      <nav class="nav-section">
         <div class="nav-section-label">勤怠管理</div>
         <button class="nav-tab" id="tab-attendance" onclick="jumpToState('勤怠未確定')">
           <i class="ti ti-clipboard-check"></i>勤怠確認・確定
@@ -1108,6 +1114,12 @@ function renderSidebar() {
   // ─── 管理者 ───────────────────────────────────
   if (role === ROLES.ADMIN) {
     el.innerHTML = `
+      <nav class="nav-section">
+        <div class="nav-section-label">自分の勤務</div>
+        <button class="nav-tab" id="tab-my-clock" onclick="jumpToMyWork()">
+          <i class="ti ti-clock"></i>打刻（自分）
+        </button>
+      </nav>
       <nav class="nav-section">
         <div class="nav-section-label">スタッフ管理</div>
         <button class="nav-tab" onclick="jumpToState('シフト作成中')">
@@ -1143,6 +1155,31 @@ function renderSidebar() {
       </nav>`;
     return;
   }
+}
+
+/* ─── 自分の打刻画面へ（店長・管理者用） ─── */
+function jumpToMyWork() {
+  const s = appState.currentStaff;
+  if (!s) return;
+  // 現在の打刻状態に応じて適切な画面へ
+  if (appState.currentState === STATES.WORKING || appState.currentState === STATES.ON_BREAK) {
+    // 既に出勤中 or 休憩中 → そのまま表示
+    updateGuideOnStateChange();
+  } else if (s.clockIn && !s.clockOut) {
+    // データ上は出勤中だが状態が違う → 出勤中に戻す
+    appState.currentState = STATES.WORKING;
+    appState.workStart = appState.workStart || parseHHMM(s.clockIn);
+    updateGuideOnStateChange();
+  } else if (s.clockOut) {
+    // 退勤済み → 勤怠未確定へ
+    appState.currentState = STATES.ATTENDANCE_PENDING;
+    updateGuideOnStateChange();
+  } else {
+    // 未打刻 → 出勤前へ
+    appState.currentState = STATES.PRE_WORK;
+    updateGuideOnStateChange();
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 /* ─── ログアウト ─── */
