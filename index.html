@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>アルバイト管理統合システム</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.6.0/dist/tabler-icons.min.css" />
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ========== ヘッダー ========== -->
+  <header class="app-header">
+    <div class="app-logo">
+      <i class="ti ti-building-store" aria-hidden="true"></i>
+      アルバイト管理システム
+    </div>
+    <div class="header-spacer"></div>
+    <div id="state-panel"></div>
+  </header>
+
+  <!-- ========== サイドバー ========== -->
+  <aside class="app-sidebar">
+
+    <!-- 共通 -->
+    <nav class="nav-section">
+      <div class="nav-section-label">共通</div>
+      <button class="nav-tab" id="tab-login"      onclick="jumpToState('未ログイン')">
+        <i class="ti ti-login" aria-hidden="true"></i>ログイン
+      </button>
+      <button class="nav-tab" id="tab-dashboard"  onclick="jumpToState('勤務希望未提出')">
+        <i class="ti ti-dashboard" aria-hidden="true"></i>ダッシュボード
+      </button>
+      <button class="nav-tab" id="tab-notify"     onclick="jumpToState('通知送信失敗')">
+        <i class="ti ti-bell" aria-hidden="true"></i>通知センター
+      </button>
+    </nav>
+
+    <!-- アルバイト -->
+    <nav class="nav-section">
+      <div class="nav-section-label">アルバイト</div>
+      <button class="nav-tab" id="tab-shift-req"  onclick="jumpToState('勤務希望未提出')">
+        <i class="ti ti-calendar-event" aria-hidden="true"></i>勤務希望
+      </button>
+      <button class="nav-tab"                     onclick="jumpToState('シフト公開済')">
+        <i class="ti ti-eye" aria-hidden="true"></i>シフト確認
+      </button>
+      <button class="nav-tab" id="tab-attendance" onclick="jumpToState('出勤前')">
+        <i class="ti ti-clock" aria-hidden="true"></i>打刻
+      </button>
+      <button class="nav-tab"                     onclick="jumpToState('欠勤申請中')">
+        <i class="ti ti-calendar-x" aria-hidden="true"></i>欠勤申請
+      </button>
+      <button class="nav-tab"                     onclick="jumpToState('代替募集中')">
+        <i class="ti ti-repeat" aria-hidden="true"></i>代替応募
+      </button>
+    </nav>
+
+    <!-- 店長 -->
+    <nav class="nav-section">
+      <div class="nav-section-label">店長</div>
+      <button class="nav-tab" id="tab-shift-mgmt" onclick="jumpToState('シフト作成中')">
+        <i class="ti ti-layout-grid" aria-hidden="true"></i>シフト作成
+      </button>
+      <button class="nav-tab"                     onclick="jumpToState('勤怠未確定')">
+        <i class="ti ti-clipboard-check" aria-hidden="true"></i>勤怠確認
+      </button>
+      <button class="nav-tab"                     onclick="jumpToState('残業申請中')">
+        <i class="ti ti-clock-plus" aria-hidden="true"></i>残業承認
+      </button>
+    </nav>
+
+    <!-- 管理者 -->
+    <nav class="nav-section">
+      <div class="nav-section-label">管理者</div>
+      <button class="nav-tab" id="tab-salary"     onclick="jumpToState('給与未計算')">
+        <i class="ti ti-coin" aria-hidden="true"></i>給与計算
+      </button>
+      <button class="nav-tab"                     onclick="alert('CSV出力（Undefined: CSV項目定義）')">
+        <i class="ti ti-download" aria-hidden="true"></i>CSV出力
+      </button>
+      <button class="nav-tab"                     onclick="alert('監査ログ（Undefined: 監査ログUI詳細）')">
+        <i class="ti ti-shield" aria-hidden="true"></i>監査ログ
+      </button>
+      <button class="nav-tab"                     onclick="alert('バックアップ（Undefined: バックアップ復元方式）')">
+        <i class="ti ti-database" aria-hidden="true"></i>バックアップ
+      </button>
+    </nav>
+
+    <!-- デモジャンプ -->
+    <div class="demo-jumper">
+      <div class="demo-jumper-label">デモ：状態ジャンプ</div>
+      <button class="demo-jump-btn" onclick="jumpToState('未ログイン')">→ 未ログイン</button>
+      <button class="demo-jump-btn" onclick="jumpToState('勤務希望未提出')">→ 勤務希望未提出</button>
+      <button class="demo-jump-btn" onclick="jumpToState('シフト作成中')">→ シフト作成中</button>
+      <button class="demo-jump-btn" onclick="jumpToState('出勤前')">→ 出勤前</button>
+      <button class="demo-jump-btn" onclick="jumpToState('出勤中')">→ 出勤中</button>
+      <button class="demo-jump-btn" onclick="jumpToState('休憩中')">→ 休憩中</button>
+      <button class="demo-jump-btn" onclick="jumpToState('勤怠未確定')">→ 勤怠未確定</button>
+      <button class="demo-jump-btn" onclick="jumpToState('給与未計算')">→ 給与未計算</button>
+      <button class="demo-jump-btn" onclick="jumpToState('通知送信失敗')">→ 通知送信失敗</button>
+    </div>
+
+  </aside>
+
+  <!-- ========== メイン ========== -->
+  <main class="app-main">
+
+    <!-- 進捗ステッパー -->
+    <div class="progress-stepper-wrap">
+      <div class="stepper-title"><i class="ti ti-route" aria-hidden="true"></i> 状態進行モデル</div>
+      <div id="progress-stepper"></div>
+    </div>
+
+    <!-- ガイドカード + メインビュー -->
+    <div class="content-row">
+
+      <!-- 左：ガイド + ビュー -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="guide-card">
+          <div id="guide-box">読み込み中...</div>
+        </div>
+        <div id="main-view"></div>
+      </div>
+
+      <!-- 右：遷移ログ -->
+      <div class="log-panel">
+        <div class="log-panel-header">
+          <i class="ti ti-activity" aria-hidden="true"></i>
+          状態遷移ログ
+        </div>
+        <div id="transition-log"></div>
+      </div>
+
+    </div>
+
+    <!-- スタッフ一覧 -->
+    <div id="staff-list-panel" class="staff-list-panel"></div>
+
+    <!-- Undefined 明示 -->
+    <div class="undefined-notice">
+      <strong>Undefined（SDS未定義のため実装なし）:</strong>
+      シフト同時編集競合制御 / 打刻改ざん対策 / GPS併用 / CSV項目定義 / バックアップ復元方式 /
+      通知テンプレ編集 / 臨時休業中の給与扱い / 労基法警告範囲 / 店舗管理機能詳細 / 将来LINE認証方式
+    </div>
+
+  </main>
+</div>
+
+<!-- グローバルエラー -->
+<div id="global-error" role="alert" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
