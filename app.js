@@ -320,12 +320,29 @@ function doShiftPublish() {
   updateStaff({ note: `${store} 8月シフト公開済み` });
 }
 
+function addShiftRequest() {
+  /* 「希望日を追加」ボタン用：重複チェックしてリストに追加するだけ（state遷移なし） */
+  const staffId = appState.currentStaff?.id;
+  if (!staffId) return;
+  const date  = document.getElementById('inp-shift-date')?.value  || '2025-08-05';
+  const start = document.getElementById('inp-shift-start')?.value || '10:00';
+  const end   = document.getElementById('inp-shift-end')?.value   || '18:00';
+  if (!date || !start || !end) { showError('日付・時間を入力してください'); return; }
+  if (start >= end) { showError('終了時間は開始時間より後にしてください'); return; }
+  const dup = DEMO.shiftRequests.find(r => r.staffId === staffId && r.date === date);
+  if (dup) { showError(`${date} はすでに登録されています`); return; }
+  DEMO.shiftRequests.push({ staffId, date, start, end });
+  showToast(`${date} ${start}〜${end} を追加しました`);
+  renderMainView(); // 一覧を再描画（state遷移なし）
+}
+
 function doShiftSubmit(payload) {
-  const date  = document.getElementById('inp-shift-date')?.value  || payload.date  || '2025-08-01';
-  const start = document.getElementById('inp-shift-start')?.value || payload.start || '10:00';
-  const end   = document.getElementById('inp-shift-end')?.value   || payload.end   || '18:00';
-  DEMO.shiftRequests.push({ staffId: appState.currentStaff?.id, date, start, end });
-  updateStaff({ note: `${date} ${start}〜${end} 提出済み` });
+  /* 「この希望を提出して完了」ボタン用：state を SHIFT_REQ_SUBMITTED へ遷移させる */
+  const staffId = appState.currentStaff?.id;
+  const myReqs  = DEMO.shiftRequests.filter(r => r.staffId === staffId);
+  if (myReqs.length === 0) { showError('希望日を1件以上追加してから提出してください'); return false; }
+  const last = myReqs[myReqs.length - 1];
+  updateStaff({ state: STATES.SHIFT_REQ_SUBMITTED, note: `${myReqs.length}件提出済み` });
 }
 
 function doClockin() {
@@ -624,13 +641,16 @@ function buildView(state) {
           <div class="shift-row header"><span>希望日</span><span>開始</span><span>終了</span><span>状態</span></div>
           ${reqRows}
         </div>
-        <div class="form-group"><label>希望日を追加</label><input type="date" id="inp-shift-date" value="2025-08-05" /></div>
-        <div class="btn-row">
-          <div class="form-group" style="flex:1"><label>開始</label><input type="time" id="inp-shift-start" value="10:00" /></div>
-          <div class="form-group" style="flex:1"><label>終了</label><input type="time" id="inp-shift-end"   value="18:00" /></div>
+        <div class="shift-add-form">
+          <div class="form-group"><label>希望日</label><input type="date" id="inp-shift-date" value="2025-08-05" /></div>
+          <div class="btn-row">
+            <div class="form-group" style="flex:1"><label>開始</label><input type="time" id="inp-shift-start" value="10:00" /></div>
+            <div class="form-group" style="flex:1"><label>終了</label><input type="time" id="inp-shift-end"   value="18:00" /></div>
+          </div>
+          <button class="btn-secondary" id="btn-shift-add">＋ 希望日を追加</button>
         </div>
-        <button class="btn-primary" id="btn-shift-submit">この希望を提出して完了</button>
-        <p class="hint">⚠ 締切後は編集できません</p>
+        <button class="btn-primary" id="btn-shift-submit">提出して完了する</button>
+        <p class="hint">⚠ 締切（7/25）後は編集できません。同じ日は1件のみ登録可。</p>
       </div>`;
   }
 
@@ -782,6 +802,10 @@ function buildView(state) {
     }
 
     // アルバイト：自分宛の確定シフトを表示
+    // phaseがpublishedの場合はconfirmedShiftsが正の数あるはず
+    // まだ店長が割当操作をしていない場合は「まだ確定されていません」を表示
+    const myStore2 = st?.store;
+    const storePhase = DEMO.shiftPhase?.[myStore2] || 'creating';
     const myConfirmed = (DEMO.confirmedShifts || []).filter(c => c.staffId === st?.id);
 
     const DOW = ['日','月','火','水','木','金','土'];
@@ -798,7 +822,11 @@ function buildView(state) {
       });
 
     const noShift = rows.length === 0
-      ? `<div class="warn-box"><i class="ti ti-info-circle"></i> まだ確定シフトがありません。店長にご確認ください。</div>`
+      ? storePhase === 'published'
+        ? `<div class="warn-box"><i class="ti ti-info-circle"></i> あなたの担当シフトはまだ割り当てられていません。店長にご確認ください。</div>`
+        : `<div class="warn-box"><i class="ti ti-clock"></i> シフトはまだ公開されていません（現在：${
+            storePhase === 'creating' ? '作成中' : '確定済み・公開待ち'
+          }）。公開後にここで確認できます。</div>`
       : '';
 
     return `
@@ -1082,6 +1110,7 @@ function bindViewEvents() {
   });
 
   // 勤務希望
+  on('btn-shift-add',    'click', () => addShiftRequest());
   on('btn-shift-submit', 'click', () => transition('SHIFT_REQUEST_SUBMIT'));
   on('btn-shift-draft',  'click', () => { transition('SHIFT_SAVE'); showToast('一時保存しました'); });
   on('btn-shift-confirm','click', () => transition('SHIFT_CONFIRM'));

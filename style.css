@@ -1034,3 +1034,69 @@ body {
   background: var(--color-active-bg);
   border-color: var(--color-primary);
 }
+
+/* ---- 承認パネル ---- */
+.approval-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.approval-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--color-bg);
+  border: 0.5px solid var(--color-border-em);
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+}
+
+.approval-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 160px;
+}
+
+.approval-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-1);
+}
+
+.approval-detail {
+  font-size: 12px;
+  color: var(--color-text-2);
+}
+
+.approval-note {
+  font-size: 12px;
+  color: var(--color-warn);
+}
+
+.approval-btns {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.approval-btns button {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+/* ---- 勤務希望追加フォーム ---- */
+.shift-add-form {
+  background: var(--color-bg);
+  border: 0.5px solid var(--color-border-em);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
