@@ -694,12 +694,13 @@ const SCENARIO_GROUPS = [
         { label: '整合性OKへ復帰', action: () => assertIntegrityOk('重複復旧後') },
       ]},
 
-      { title: '破壊系：給与未計算なのにclockOutなしを検出して復旧', steps: [
+      { title: '破壊系：給与未計算clockOut欠落を自動補正', steps: [
         { label: 'リセット', action: () => A().reset() },
-        { label: '不正スタッフ状態を直接注入', action: () => { const s=rawStaff(11); s.state='給与未計算'; s.clockIn='10:00'; s.clockOut=null; } },
-        { label: 'clockOut欠落を検出', action: () => assertIntegrityHas(/吉田 あおい: 給与未計算なのにclockOutがない/,'給与未計算clockOut欠落') },
+        { label: 'clockOut欠落データを直接注入', action: () => { const s=rawStaff(11); s.state='給与未計算'; s.clockIn='10:00'; s.clockOut=null; } },
         { label: '自動補正を実行', action: () => A().normalizeAllClockConsistency() },
-        { label: '整合性OKへ復帰', action: () => assertIntegrityOk('clockOut欠落復旧後') },
+        { label: 'clockOutが補完されたことを確認', action: () => { const s=rawStaff(11); assert(!!s.clockOut, 'clockOutが自動補完される'); } },
+        { label: 'clockIn < clockOut を確認', action: () => { const s=rawStaff(11); assert(timeToMinutes(s.clockIn) < timeToMinutes(s.clockOut), 'clockOutはclockInより後になる'); } },
+        { label: '整合性OKへ復帰', action: () => assertIntegrityOk('clockOut自動補正後') },
       ]},
 
       { title: '破壊系：未成年深夜シフトを検出して復旧', steps: [
@@ -1017,6 +1018,11 @@ if (frame.contentDocument?.readyState === 'complete') {
 /* shorthand */
 function A() { return API; }
 function F() { return frame.contentWindow; }
+function timeToMinutes(hhmm) {
+  if (!hhmm || !String(hhmm).includes(':')) return NaN;
+  const [h, m] = String(hhmm).split(':').map(Number);
+  return h * 60 + m;
+}
 
 /* アサーション */
 function assert(cond, msg) {

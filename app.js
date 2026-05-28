@@ -238,6 +238,17 @@ function ensureClockConsistencyForStaff(staff, nextState = staff?.state) {
       const endBase = start ? new Date(start.getTime() + 8 * 3600000) : now();
       staff.clockOut = hhmm(endBase);
     }
+
+    // 直接ジャンプ・テスト補完などで clockIn と clockOut が同時刻/逆転した場合は、
+    // 最低1分の勤務時間になるように補正する。
+    if (staff.clockIn && staff.clockOut) {
+      const start = parseHHMM(staff.clockIn);
+      const end = parseHHMM(staff.clockOut);
+      if (start && end && start.getTime() >= end.getTime()) {
+        staff.clockOut = hhmm(new Date(start.getTime() + 60000));
+      }
+    }
+
     if (staff.breakMin === undefined || staff.breakMin === null) staff.breakMin = 0;
 
     if (appState.currentStaff?.id === staff.id) {
