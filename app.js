@@ -152,6 +152,12 @@ const DEMO = {
   },
 };
 
+// test-runner.html 互換用。iframe 側から F().DEMO.shiftRequests のように参照できるようにする。
+// top-level const は window のプロパティにならないため、明示的に公開する。
+if (typeof window !== 'undefined') {
+  window.DEMO = DEMO;
+}
+
 /* ═══════════════════════════════════════
    グローバル状態
 ═══════════════════════════════════════ */
