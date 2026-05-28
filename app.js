@@ -2218,3 +2218,75 @@ function doLogout() {
   updateGuideOnStateChange();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+/* ═══════════════════════════════════════
+   外部テスト用 Public API
+   window.ShiftAPI 経由で外部JSから操作可能
+═══════════════════════════════════════ */
+window.ShiftAPI = {
+  /* 状態取得 */
+  getState:        () => ({ ...appState }),
+  getCurrentState: () => appState.currentState,
+  getCurrentRole:  () => appState.currentRole,
+  getCurrentStaff: () => appState.currentStaff ? { ...appState.currentStaff } : null,
+  getStaff:        (id) => DEMO.staff.find(s => s.id === id),
+  getAllStaff:      () => DEMO.staff.map(s => ({ ...s })),
+  getShiftRequests:() => [...DEMO.shiftRequests],
+  getConfirmedShifts: () => [...(DEMO.confirmedShifts || [])],
+  getPendingShifts:() => [...(DEMO.pendingShifts || [])],
+  getShiftPhase:   (store) => DEMO.shiftPhase?.[store],
+  getTransitionLog:() => [...appState.transitionLog],
+
+  /* 操作 */
+  loginAsStaff:    (staffId) => loginAsStaff(staffId),
+  logout:          () => doLogout(),
+  jumpToState:     (state) => jumpToState(state),
+  transition:      (event, payload) => transition(event, payload || {}),
+  confirmShift:    (date, staffId) => confirmShift(date, staffId),
+  confirmAttendance: (staffId) => confirmAttendance(staffId),
+  approveOvertime: (staffId) => approveOvertime(staffId),
+  rejectOvertime:  (staffId) => rejectOvertime(staffId),
+  approveAbsence:  (staffId) => approveAbsence(staffId),
+  rejectAbsence:   (staffId) => rejectAbsence(staffId),
+
+  /* フォーム値注入（テスト時に入力欄に値をセット） */
+  setFormValue: (id, value) => {
+    const el = document.getElementById(id);
+    if (el) { el.value = value; return true; }
+    return false;
+  },
+
+  /* リセット */
+  reset: () => {
+    doLogout();
+    DEMO.shiftRequests  = [];
+    DEMO.confirmedShifts = [];
+    DEMO.pendingShifts  = [];
+    Object.keys(DEMO.shiftPhase || {}).forEach(k => { DEMO.shiftPhase[k] = 'creating'; });
+    DEMO.staff.forEach(s => {
+      s.state = STATES.LOGGED_OUT;
+      s.clockIn = null; s.clockOut = null;
+      s.breakMin = 0; s.overtimeMin = 0;
+      s.note = '出勤前';
+    });
+    appState.transitionLog = [];
+    updateGuideOnStateChange();
+  },
+
+  /* イベント通知（テストランナーが購読できる） */
+  _listeners: [],
+  on: (fn) => { window.ShiftAPI._listeners.push(fn); },
+  off: (fn) => { window.ShiftAPI._listeners = window.ShiftAPI._listeners.filter(f => f !== fn); },
+  _emit: (event, data) => { window.ShiftAPI._listeners.forEach(fn => fn(event, data)); },
+};
+
+/* 状態変化をテストランナーに通知 */
+const _origUpdateGuide = updateGuideOnStateChange;
+updateGuideOnStateChange = function() {
+  _origUpdateGuide();
+  window.ShiftAPI._emit('stateChange', {
+    state: appState.currentState,
+    role:  appState.currentRole,
+    staff: appState.currentStaff?.name,
+  });
+};

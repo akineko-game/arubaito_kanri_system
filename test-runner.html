@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>テストランナー — アルバイト管理システム</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.6.0/dist/tabler-icons.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #f5f4f0;
+      --surface: #ffffff;
+      --border:  rgba(0,0,0,0.10);
+      --text-1:  #1a1a18;
+      --text-2:  #5a5a56;
+      --text-3:  #909088;
+      --ok:      #2d7a4f;
+      --ok-bg:   #eaf3de;
+      --warn:    #b07010;
+      --warn-bg: #faeeda;
+      --error:   #a32d2d;
+      --error-bg:#fcebeb;
+      --primary: #1e5fa8;
+      --primary-bg: #e6f1fb;
+      --radius:  10px;
+    }
+    body {
+      font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      font-size: 14px;
+      background: var(--bg);
+      color: var(--text-1);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── ヘッダー ── */
+    .header {
+      background: var(--surface);
+      border-bottom: 0.5px solid var(--border);
+      padding: 0 16px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .header-title { font-size: 15px; font-weight: 700; color: var(--primary); }
+    .header-spacer { flex: 1; }
+    .speed-wrap { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
+    .speed-wrap input { width: 80px; }
+
+    /* ── メインレイアウト ── */
+    .main {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── 左ペイン：コントロール ── */
+    .control-pane {
+      background: var(--surface);
+      border-right: 0.5px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .control-toolbar {
+      padding: 10px 12px;
+      border-bottom: 0.5px solid var(--border);
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 7px 14px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 0.5px solid transparent;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.12s;
+    }
+    .btn-run    { background: var(--ok);      color: #fff; border-color: var(--ok); }
+    .btn-pause  { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); }
+    .btn-stop   { background: var(--error-bg);color: var(--error);border-color: var(--error); }
+    .btn-reset  { background: var(--bg);      color: var(--text-2);border-color: var(--border); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .scenario-list {
+      padding: 10px 12px;
+      border-bottom: 0.5px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .scenario-label { font-size: 11px; font-weight: 600; color: var(--text-3); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 2px; }
+
+    .scenario-btn {
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      background: var(--bg);
+      border: 0.5px solid var(--border);
+      text-align: left;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--text-1);
+      transition: all 0.12s;
+    }
+    .scenario-btn:hover { background: var(--primary-bg); border-color: var(--primary); color: var(--primary); }
+    .scenario-btn.active { background: var(--primary-bg); border-color: var(--primary); color: var(--primary); font-weight: 600; }
+
+    /* ── ステップログ ── */
+    .step-log { flex: 1; overflow-y: auto; padding: 8px 0; }
+    .step-item {
+      padding: 6px 12px;
+      border-bottom: 0.5px solid var(--border);
+      display: grid;
+      grid-template-columns: 20px 1fr auto;
+      gap: 8px;
+      align-items: start;
+      font-size: 12px;
+    }
+    .step-icon { font-size: 14px; margin-top: 1px; }
+    .step-icon.ok    { color: var(--ok); }
+    .step-icon.warn  { color: var(--warn); }
+    .step-icon.error { color: var(--error); }
+    .step-icon.run   { color: var(--primary); }
+    .step-icon.idle  { color: var(--text-3); }
+    .step-desc { color: var(--text-1); line-height: 1.4; }
+    .step-desc .step-label { font-weight: 600; }
+    .step-desc .step-detail { color: var(--text-2); font-size: 11px; margin-top: 1px; }
+    .step-status { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+
+    /* ── 右ペイン：iframe ── */
+    .preview-pane {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .preview-bar {
+      background: var(--surface);
+      border-bottom: 0.5px solid var(--border);
+      padding: 6px 12px;
+      font-size: 12px;
+      color: var(--text-2);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .preview-state {
+      background: var(--primary-bg);
+      color: var(--primary);
+      padding: 2px 9px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    #app-frame {
+      flex: 1;
+      border: none;
+      width: 100%;
+    }
+
+    /* ── 進捗バー ── */
+    .progress-bar-wrap {
+      height: 4px;
+      background: var(--border);
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--primary);
+      transition: width 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div class="header">
+  <i class="ti ti-test-pipe" style="font-size:20px;color:var(--primary)"></i>
+  <span class="header-title">テストランナー</span>
+  <span style="font-size:12px;color:var(--text-3)">アルバイト管理統合システム</span>
+  <div class="header-spacer"></div>
+  <div class="speed-wrap">
+    <i class="ti ti-gauge"></i>
+    ステップ間隔
+    <input type="range" id="speed-range" min="200" max="3000" step="100" value="900" />
+    <span id="speed-label">0.9秒</span>
+  </div>
+</div>
+
+<!-- メイン -->
+<div class="main">
+
+  <!-- 左ペイン -->
+  <div class="control-pane">
+
+    <div class="control-toolbar">
+      <button class="btn btn-run"   id="btn-run"   onclick="runScenario()"><i class="ti ti-player-play"></i> 実行</button>
+      <button class="btn btn-pause" id="btn-pause"  onclick="pauseScenario()" disabled><i class="ti ti-player-pause"></i> 一時停止</button>
+      <button class="btn btn-run"   id="btn-resume" onclick="resumeScenario()" disabled style="display:none"><i class="ti ti-player-play"></i> 再開</button>
+      <button class="btn btn-stop"  id="btn-stop"   onclick="stopScenario()" disabled><i class="ti ti-player-stop"></i> 中止</button>
+      <button class="btn btn-reset" id="btn-reset"  onclick="resetAll()"><i class="ti ti-refresh"></i> リセット</button>
+    </div>
+
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-bar" style="width:0%"></div></div>
+
+    <div class="scenario-list">
+      <div class="scenario-label">シナリオ選択</div>
+      <button class="scenario-btn active" data-scenario="0" onclick="selectScenario(0)">
+        <i class="ti ti-user" style="color:var(--primary)"></i> アルバイトの一日（田中花子）
+      </button>
+      <button class="scenario-btn" data-scenario="1" onclick="selectScenario(1)">
+        <i class="ti ti-crown" style="color:#b07010"></i> 店長のシフト作成フロー（山田太郎）
+      </button>
+      <button class="scenario-btn" data-scenario="2" onclick="selectScenario(2)">
+        <i class="ti ti-shield-check" style="color:#534ab7"></i> 管理者の給与計算フロー（佐藤健一）
+      </button>
+      <button class="scenario-btn" data-scenario="3" onclick="selectScenario(3)">
+        <i class="ti ti-repeat" style="color:var(--error)"></i> 欠勤→代替募集フロー
+      </button>
+    </div>
+
+    <div class="step-log" id="step-log"></div>
+  </div>
+
+  <!-- 右ペイン -->
+  <div class="preview-pane">
+    <div class="preview-bar">
+      <i class="ti ti-device-desktop"></i>
+      システム画面プレビュー —
+      <span class="preview-state" id="preview-state">未接続</span>
+      <span id="preview-who" style="margin-left:4px"></span>
+    </div>
+    <iframe id="app-frame" src="index.html"></iframe>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════
+   テストランナー本体
+═══════════════════════════════════════ */
+
+let API = null;          // iframe内のShiftAPI
+let currentScenarioIdx = 0;
+let steps = [];          // 現在のシナリオのステップ配列
+let stepIdx = 0;
+let running = false;
+let paused  = false;
+let stopped = false;
+let timer   = null;
+
+/* ── iframe 接続 ── */
+const frame = document.getElementById('app-frame');
+frame.addEventListener('load', () => {
+  setTimeout(() => {
+    try {
+      API = frame.contentWindow.ShiftAPI;
+      API.on((event, data) => {
+        document.getElementById('preview-state').textContent = data.state || '—';
+        const who = document.getElementById('preview-who');
+        who.textContent = data.staff ? `（${data.staff}）` : '';
+      });
+      log('info', 'システム接続完了', 'ShiftAPIを取得しました');
+    } catch(e) {
+      log('error', '接続失敗', e.message);
+    }
+  }, 800);
+});
+
+/* ── スピード設定 ── */
+const speedRange = document.getElementById('speed-range');
+speedRange.addEventListener('input', () => {
+  document.getElementById('speed-label').textContent = (speedRange.value / 1000).toFixed(1) + '秒';
+});
+function getDelay() { return Number(speedRange.value); }
+
+/* ═══════════════════════════════════════
+   シナリオ定義
+═══════════════════════════════════════ */
+const SCENARIOS = [
+
+  /* ─── 0: アルバイトの一日（田中花子・id=7） ─── */
+  {
+    title: 'アルバイトの一日（田中花子）',
+    steps: [
+      { label: 'リセット',             detail: '全データを初期化',                    action: () => API.reset() },
+      { label: 'ログイン',             detail: '田中花子（id:7）でログイン',           action: () => API.loginAsStaff(7) },
+      { label: '勤務希望：日付入力',   detail: '2025-08-05 を選択',                   action: () => { API.setFormValue('inp-shift-date','2025-08-05'); API.setFormValue('inp-shift-start','10:00'); API.setFormValue('inp-shift-end','18:00'); } },
+      { label: '希望日を追加',         detail: '8/5 10:00〜18:00 を追加',             action: () => frame.contentWindow.addShiftRequest() },
+      { label: '希望日を追加（2件目）',detail: '8/7 13:00〜21:00 を追加',             action: () => { API.setFormValue('inp-shift-date','2025-08-07'); API.setFormValue('inp-shift-start','13:00'); API.setFormValue('inp-shift-end','21:00'); frame.contentWindow.addShiftRequest(); } },
+      { label: '勤務希望を提出',       detail: 'SHIFT_REQUEST_SUBMIT イベント',       action: () => API.transition('SHIFT_REQUEST_SUBMIT') },
+      { label: 'ログアウト',           detail: '田中花子がログアウト',                 action: () => API.logout() },
+      { label: '店長ログイン',         detail: '山田太郎（id:3）でログイン',           action: () => API.loginAsStaff(3) },
+      { label: 'シフト割当：田中8/5',  detail: '8/5の田中花子を割当確定',             action: () => API.confirmShift('2025-08-05', 7) },
+      { label: 'シフト割当：田中8/7',  detail: '8/7の田中花子を割当確定',             action: () => API.confirmShift('2025-08-07', 7) },
+      { label: 'シフトを確定',         detail: 'SHIFT_CONFIRM イベント',              action: () => API.transition('SHIFT_CONFIRM') },
+      { label: 'スタッフへ公開',       detail: 'SHIFT_PUBLISH イベント',              action: () => API.transition('SHIFT_PUBLISH') },
+      { label: '店長ログアウト',       detail: '山田太郎がログアウト',                 action: () => API.logout() },
+      { label: '田中花子ログイン',     detail: '再ログイン、シフト確認画面へ',         action: () => API.loginAsStaff(7) },
+      { label: 'シフト確認',           detail: 'シフト公開済み画面を確認',             action: () => {} },
+      { label: '出勤打刻',             detail: 'CLOCK_IN イベント',                   action: () => API.transition('CLOCK_IN') },
+      { label: '休憩開始',             detail: 'BREAK_START イベント',                action: () => API.transition('BREAK_START') },
+      { label: '休憩終了',             detail: 'BREAK_END イベント',                  action: () => API.transition('BREAK_END') },
+      { label: '退勤打刻',             detail: 'CLOCK_OUT イベント',                  action: () => API.transition('CLOCK_OUT') },
+      { label: '完了',                 detail: '勤怠未確定状態を確認',                 action: () => {} },
+    ]
+  },
+
+  /* ─── 1: 店長のシフト作成フロー（山田太郎・id=3） ─── */
+  {
+    title: '店長のシフト作成フロー（山田太郎）',
+    steps: [
+      { label: 'リセット',             detail: '全データを初期化',                    action: () => API.reset() },
+      { label: 'アルバイト1ログイン',  detail: '田中花子（id:7）でログイン',           action: () => API.loginAsStaff(7) },
+      { label: '希望提出①',           detail: '8/1 10:00〜18:00',                    action: () => { API.setFormValue('inp-shift-date','2025-08-01'); API.setFormValue('inp-shift-start','10:00'); API.setFormValue('inp-shift-end','18:00'); frame.contentWindow.addShiftRequest(); } },
+      { label: '提出して完了',         detail: 'SHIFT_REQUEST_SUBMIT',                action: () => API.transition('SHIFT_REQUEST_SUBMIT') },
+      { label: 'アルバイト1ログアウト',detail: '',                                    action: () => API.logout() },
+      { label: 'アルバイト2ログイン',  detail: '加藤健太（id:10）でログイン',          action: () => API.loginAsStaff(10) },
+      { label: '希望提出②',           detail: '8/1 13:00〜21:00',                    action: () => { API.setFormValue('inp-shift-date','2025-08-01'); API.setFormValue('inp-shift-start','13:00'); API.setFormValue('inp-shift-end','21:00'); frame.contentWindow.addShiftRequest(); } },
+      { label: '提出して完了',         detail: 'SHIFT_REQUEST_SUBMIT',                action: () => API.transition('SHIFT_REQUEST_SUBMIT') },
+      { label: 'アルバイト2ログアウト',detail: '',                                    action: () => API.logout() },
+      { label: '店長ログイン',         detail: '山田太郎（id:3）でログイン',           action: () => API.loginAsStaff(3) },
+      { label: 'シフト割当①',         detail: '8/1 田中花子を割当確定',              action: () => API.confirmShift('2025-08-01', 7) },
+      { label: 'シフト割当②',         detail: '8/1 加藤健太を割当確定',              action: () => API.confirmShift('2025-08-01', 10) },
+      { label: 'シフトを確定',         detail: 'SHIFT_CONFIRM',                       action: () => API.transition('SHIFT_CONFIRM') },
+      { label: 'スタッフへ公開',       detail: 'SHIFT_PUBLISH',                       action: () => API.transition('SHIFT_PUBLISH') },
+      { label: '公開完了確認',         detail: 'シフト公開済み状態を確認',             action: () => {} },
+    ]
+  },
+
+  /* ─── 2: 管理者の給与計算フロー（佐藤健一・id=1） ─── */
+  {
+    title: '管理者の給与計算フロー（佐藤健一）',
+    steps: [
+      { label: 'リセット',             detail: '全データを初期化',                    action: () => API.reset() },
+      { label: '管理者ログイン',       detail: '佐藤健一（id:1）でログイン',           action: () => API.loginAsStaff(1) },
+      { label: '勤怠確認画面',         detail: 'ATTENDANCE_PENDINGへ移動',           action: () => API.jumpToState('勤怠未確定') },
+      { label: '金子海斗の勤怠確定',   detail: 'id:38 勤怠を確定',                    action: () => { frame.contentWindow.DEMO.staff.find(s=>s.id===38).clockIn='10:00'; frame.contentWindow.DEMO.staff.find(s=>s.id===38).clockOut='18:08'; frame.contentWindow.DEMO.staff.find(s=>s.id===38).state='勤怠未確定'; frame.contentWindow.confirmAttendance(38); } },
+      { label: '内田朱音の勤怠確定',   detail: 'id:43 勤怠を確定',                    action: () => { frame.contentWindow.DEMO.staff.find(s=>s.id===43).clockIn='10:00'; frame.contentWindow.DEMO.staff.find(s=>s.id===43).clockOut='18:00'; frame.contentWindow.DEMO.staff.find(s=>s.id===43).state='勤怠未確定'; frame.contentWindow.confirmAttendance(43); } },
+      { label: '給与計算画面',         detail: 'SALARY_PENDINGへ移動',               action: () => API.jumpToState('給与未計算') },
+      { label: '給与計算実行',         detail: 'SALARY_CALC イベント',                action: () => API.transition('SALARY_CALC') },
+      { label: '完了',                 detail: '給与計算済み状態を確認',               action: () => {} },
+    ]
+  },
+
+  /* ─── 3: 欠勤→代替募集フロー ─── */
+  {
+    title: '欠勤→代替募集フロー',
+    steps: [
+      { label: 'リセット',             detail: '全データを初期化',                    action: () => API.reset() },
+      { label: '店長ログイン',         detail: '山田太郎（id:3）でログイン',           action: () => API.loginAsStaff(3) },
+      { label: 'シフト割当（福田）',   detail: '8/1 福田ひより を割当確定',            action: () => { frame.contentWindow.DEMO.shiftRequests.push({staffId:33,date:'2025-08-01',start:'10:00',end:'18:00'}); API.confirmShift('2025-08-01',33); } },
+      { label: 'シフトを確定',         detail: 'SHIFT_CONFIRM',                       action: () => API.transition('SHIFT_CONFIRM') },
+      { label: 'スタッフへ公開',       detail: 'SHIFT_PUBLISH',                       action: () => API.transition('SHIFT_PUBLISH') },
+      { label: '店長ログアウト',       detail: '',                                    action: () => API.logout() },
+      { label: '福田ひよりログイン',   detail: '福田ひより（id:33）でログイン',         action: () => API.loginAsStaff(33) },
+      { label: '欠勤申請',             detail: '欠勤申請パネルを開いて申請',           action: () => { frame.contentWindow.appState.currentState = '欠勤申請中'; frame.contentWindow.DEMO.staff.find(s=>s.id===33).state='欠勤申請中'; frame.contentWindow.updateGuideOnStateChange(); } },
+      { label: 'ログアウト',           detail: '',                                    action: () => API.logout() },
+      { label: '店長ログイン',         detail: '山田太郎（id:3）で再ログイン',          action: () => API.loginAsStaff(3) },
+      { label: '欠勤を承認',           detail: '福田ひよりの欠勤を承認→代替募集へ',    action: () => frame.contentWindow.approveAbsence(33) },
+      { label: '代替募集確認',         detail: '代替募集中状態を確認',                 action: () => {} },
+    ]
+  },
+];
+
+/* ═══════════════════════════════════════
+   UI操作
+═══════════════════════════════════════ */
+function selectScenario(idx) {
+  currentScenarioIdx = idx;
+  document.querySelectorAll('.scenario-btn').forEach((b,i) => {
+    b.classList.toggle('active', i === idx);
+  });
+  resetAll();
+}
+
+function resetAll() {
+  stopScenario();
+  if (API) API.reset();
+  stepIdx = 0;
+  steps = SCENARIOS[currentScenarioIdx].steps;
+  renderStepLog();
+  document.getElementById('progress-bar').style.width = '0%';
+}
+
+function runScenario() {
+  if (!API) { alert('システムが読み込み中です。しばらくお待ちください。'); return; }
+  steps   = SCENARIOS[currentScenarioIdx].steps;
+  stepIdx = 0;
+  running = true;
+  paused  = false;
+  stopped = false;
+  setButtons('running');
+  renderStepLog();
+  runNext();
+}
+
+function pauseScenario() {
+  paused = true;
+  clearTimeout(timer);
+  setButtons('paused');
+  log('warn', '一時停止', `ステップ ${stepIdx}/${steps.length} で停止中`);
+}
+
+function resumeScenario() {
+  paused = false;
+  setButtons('running');
+  log('info', '再開', `ステップ ${stepIdx+1} から再開`);
+  runNext();
+}
+
+function stopScenario() {
+  running = false;
+  paused  = false;
+  stopped = true;
+  clearTimeout(timer);
+  setButtons('idle');
+}
+
+function setButtons(state) {
+  const run    = document.getElementById('btn-run');
+  const pause  = document.getElementById('btn-pause');
+  const resume = document.getElementById('btn-resume');
+  const stop   = document.getElementById('btn-stop');
+  if (state === 'running') {
+    run.disabled = true; pause.disabled = false; stop.disabled = false;
+    pause.style.display = ''; resume.style.display = 'none';
+  } else if (state === 'paused') {
+    run.disabled = true; pause.disabled = true; stop.disabled = false;
+    pause.style.display = 'none'; resume.style.display = '';
+  } else {
+    run.disabled = false; pause.disabled = true; stop.disabled = true;
+    pause.style.display = ''; resume.style.display = 'none';
+  }
+}
+
+/* ── ステップ実行 ── */
+function runNext() {
+  if (!running || paused || stopped) return;
+  if (stepIdx >= steps.length) {
+    running = false;
+    setButtons('idle');
+    log('ok', '✓ テスト完了', `全 ${steps.length} ステップ実行完了`);
+    document.getElementById('progress-bar').style.width = '100%';
+    return;
+  }
+
+  const step = steps[stepIdx];
+  updateStepUI(stepIdx, 'run');
+  document.getElementById('progress-bar').style.width =
+    Math.round(stepIdx / steps.length * 100) + '%';
+
+  try {
+    step.action();
+    updateStepUI(stepIdx, 'ok');
+    stepIdx++;
+    timer = setTimeout(runNext, getDelay());
+  } catch(e) {
+    updateStepUI(stepIdx, 'error', e.message);
+    log('error', `エラー: ${step.label}`, e.message);
+    stopScenario();
+  }
+}
+
+/* ── ステップログUI ── */
+function renderStepLog() {
+  const steps = SCENARIOS[currentScenarioIdx].steps;
+  const el = document.getElementById('step-log');
+  el.innerHTML = steps.map((s, i) => `
+    <div class="step-item" id="step-${i}">
+      <span class="step-icon idle"><i class="ti ti-circle"></i></span>
+      <div class="step-desc">
+        <div class="step-label">${s.label}</div>
+        <div class="step-detail">${s.detail}</div>
+      </div>
+      <span class="step-status" id="step-status-${i}"></span>
+    </div>`).join('');
+}
+
+function updateStepUI(idx, state, msg) {
+  const item   = document.getElementById(`step-${idx}`);
+  const icon   = item?.querySelector('.step-icon');
+  const status = document.getElementById(`step-status-${idx}`);
+  if (!item) return;
+  const map = {
+    ok:    { cls: 'ok',    icon: 'ti-check',        text: '✓' },
+    error: { cls: 'error', icon: 'ti-x',            text: 'NG' },
+    run:   { cls: 'run',   icon: 'ti-loader-2',     text: '...' },
+    idle:  { cls: 'idle',  icon: 'ti-circle',       text: '' },
+  };
+  const m = map[state] || map.idle;
+  icon.className   = `step-icon ${m.cls}`;
+  icon.innerHTML   = `<i class="ti ${m.icon}"></i>`;
+  status.textContent = msg || m.text;
+  if (state === 'run') item.scrollIntoView({ block: 'nearest' });
+}
+
+function log(type, label, detail) {
+  const icons = { ok: 'ti-check', error: 'ti-x', warn: 'ti-alert-triangle', info: 'ti-info-circle' };
+  const el = document.getElementById('step-log');
+  const div = document.createElement('div');
+  div.className = 'step-item';
+  div.innerHTML = `
+    <span class="step-icon ${type}"><i class="ti ${icons[type]||'ti-info-circle'}"></i></span>
+    <div class="step-desc">
+      <div class="step-label">${label}</div>
+      <div class="step-detail">${detail || ''}</div>
+    </div>
+    <span class="step-status">${new Date().toLocaleTimeString('ja-JP')}</span>`;
+  el.appendChild(div);
+  div.scrollIntoView({ block: 'nearest' });
+}
+
+/* ── 初期化 ── */
+selectScenario(0);
+</script>
+</body>
+</html>
