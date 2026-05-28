@@ -1633,6 +1633,157 @@ function loginAsStaff(staffId) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+/* ─── 勤務実態集計 ─── */
+function calcWorkSummary(staff) {
+  if (!staff) return { current: { shifts:0, minutes:0, salary:0 }, history: { months:[], totalShifts:0, totalMinutes:0, totalSalary:0 } };
+
+  const now   = new Date();
+  const thisY = now.getFullYear();
+  const thisM = now.getMonth() + 1; // 1-12
+
+  // confirmedShifts から自分の分を取得
+  const myShifts = (DEMO.confirmedShifts || []).filter(c => c.staffId === staff.id);
+
+  // 月ごとに集計
+  function collectMonth(year, month) {
+    const mm = String(month).padStart(2, '0');
+    const prefix = `${year}-${mm}`;
+    const shifts = myShifts.filter(c => c.date.startsWith(prefix));
+
+    // 実働時間計算（clockIn/clockOut があれば使う、なければシフト時間で推定）
+    let totalMin = 0;
+    shifts.forEach(c => {
+      const s2 = DEMO.staff.find(s => s.id === staff.id);
+      // 当該シフトの打刻データがあれば使う（簡易：staff.clockIn/clockOutは最新のみ保持）
+      // → デモでは確定シフトの時間差で推定
+      const [sh, sm] = c.start.split(':').map(Number);
+      const [eh, em] = c.end.split(':').map(Number);
+      totalMin += (eh * 60 + em) - (sh * 60 + sm) - 60; // 60分休憩を仮定
+    });
+
+    const salary = staff.hourlyRate
+      ? Math.round(staff.hourlyRate * totalMin / 60)
+      : null;
+
+    return { year, month, label: `${year}年${month}月`, shifts: shifts.length, minutes: Math.max(0, totalMin), salary };
+  }
+
+  // 当月
+  const current = collectMonth(thisY, thisM);
+
+  // 過去3ヶ月
+  const historyMonths = [];
+  for (let i = 1; i <= 3; i++) {
+    let m = thisM - i;
+    let y = thisY;
+    if (m <= 0) { m += 12; y -= 1; }
+    historyMonths.push(collectMonth(y, m));
+  }
+
+  const totalShifts  = historyMonths.reduce((s, m) => s + m.shifts,  0);
+  const totalMinutes = historyMonths.reduce((s, m) => s + m.minutes, 0);
+  const totalSalary  = staff.hourlyRate
+    ? Math.round(staff.hourlyRate * totalMinutes / 60)
+    : null;
+
+  return {
+    current,
+    history: { months: historyMonths, totalShifts, totalMinutes, totalSalary }
+  };
+}
+
+/* ─── 勤務実態パネル表示 ─── */
+function showWorkSummary(type) {
+  const me = appState.currentStaff;
+  if (!me) return;
+  const mainView = document.getElementById('main-view');
+  if (!mainView) return;
+
+  const summary = calcWorkSummary(me);
+
+  // タブ強調
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('next-target'));
+  const tabId = type === 'current' ? 'tab-work-current' : 'tab-work-history';
+  document.getElementById(tabId)?.classList.add('next-target');
+
+  if (type === 'current') {
+    const c = summary.current;
+    const workHours = Math.floor(c.minutes / 60);
+    const workMins  = c.minutes % 60;
+
+    mainView.innerHTML = `
+      <div class="view-card">
+        <h2 class="view-title"><i class="ti ti-chart-bar"></i> 勤務実態（当月）</h2>
+        <div class="info-row"><span class="info-label">スタッフ</span><span class="staff-name-chip">${me.name}（${me.store}）</span></div>
+        <div class="info-row"><span class="info-label">対象月</span><span>${c.label}</span></div>
+        <div class="info-grid" style="margin-top:8px">
+          <div class="info-card">
+            <div class="info-num">${c.shifts}</div>
+            <div>確定シフト数</div>
+          </div>
+          <div class="info-card">
+            <div class="info-num">${workHours}<span style="font-size:16px;font-weight:400">h${workMins > 0 ? workMins + 'm' : ''}</span></div>
+            <div>推定実働時間</div>
+          </div>
+        </div>
+        ${c.salary !== null ? `
+        <div class="info-card" style="margin-top:8px;text-align:center">
+          <div class="info-num">¥${c.salary.toLocaleString()}</div>
+          <div>推定給与（時給¥${me.hourlyRate} × ${fmtMinutes(c.minutes)}）</div>
+        </div>` : ''}
+        ${c.shifts === 0 ? '<div class="warn-box" style="margin-top:8px"><i class="ti ti-info-circle"></i> 当月の確定シフトはまだありません</div>' : ''}
+        <p class="hint" style="margin-top:8px">※ 休憩60分を差し引いた推定値です。実際の打刻データが確定した後に正式な数値が確定します。</p>
+      </div>`;
+
+  } else {
+    const h = summary.history;
+    const totalH = Math.floor(h.totalMinutes / 60);
+    const totalM = h.totalMinutes % 60;
+
+    const monthRows = h.months.map(m => {
+      const hh = Math.floor(m.minutes / 60);
+      const mm = m.minutes % 60;
+      return `
+        <div class="work-history-row">
+          <span class="work-month">${m.label}</span>
+          <span class="work-shifts">${m.shifts}件</span>
+          <span class="work-time">${hh}h${mm > 0 ? mm + 'm' : ''}</span>
+          <span class="work-salary">${m.salary !== null ? '¥' + m.salary.toLocaleString() : '—'}</span>
+        </div>`;
+    }).join('');
+
+    mainView.innerHTML = `
+      <div class="view-card">
+        <h2 class="view-title"><i class="ti ti-history"></i> 勤務実態（過去3ヶ月）</h2>
+        <div class="info-row"><span class="info-label">スタッフ</span><span class="staff-name-chip">${me.name}（${me.store}）</span></div>
+        <div class="work-history-table">
+          <div class="work-history-row work-history-header">
+            <span>月</span><span>件数</span><span>実働</span><span>推定給与</span>
+          </div>
+          ${monthRows || '<div class="work-history-row"><span style="color:var(--color-text-3)">データなし</span></div>'}
+        </div>
+        <div class="info-grid" style="margin-top:12px">
+          <div class="info-card">
+            <div class="info-num">${h.totalShifts}</div>
+            <div>合計シフト数</div>
+          </div>
+          <div class="info-card">
+            <div class="info-num">${totalH}<span style="font-size:16px;font-weight:400">h${totalM > 0 ? totalM + 'm' : ''}</span></div>
+            <div>合計実働時間</div>
+          </div>
+        </div>
+        ${h.totalSalary !== null && h.totalShifts > 0 ? `
+        <div class="info-card" style="margin-top:8px;text-align:center">
+          <div class="info-num">¥${h.totalSalary.toLocaleString()}</div>
+          <div>3ヶ月合計推定給与</div>
+        </div>` : ''}
+        <p class="hint" style="margin-top:8px">※ 休憩60分を差し引いた推定値です。</p>
+      </div>`;
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 /* ─── デモジャンプ（サイドバーボタン用） ─── */
 function jumpToState(state) {
   appState.currentState = state;
@@ -1716,6 +1867,7 @@ function renderSidebar() {
 
   // ─── アルバイト ───────────────────────────────
   if (role === ROLES.PART_TIME) {
+    const workSummary = calcWorkSummary(appState.currentStaff);
     el.innerHTML = `
       <nav class="nav-section">
         <div class="nav-section-label">マイメニュー</div>
@@ -1733,6 +1885,21 @@ function renderSidebar() {
         </button>
         <button class="nav-tab" id="tab-replace" onclick="showReplacementPanel()">
           <i class="ti ti-repeat"></i>代替応募
+        </button>
+      </nav>
+      <nav class="nav-section">
+        <div class="nav-section-label">勤務実態</div>
+        <button class="nav-tab" id="tab-work-current" onclick="showWorkSummary('current')">
+          <i class="ti ti-chart-bar"></i>当月
+          ${workSummary.current.shifts > 0
+            ? `<span class="tab-badge">${workSummary.current.shifts}件</span>`
+            : ''}
+        </button>
+        <button class="nav-tab" id="tab-work-history" onclick="showWorkSummary('history')">
+          <i class="ti ti-history"></i>過去3ヶ月
+          ${workSummary.history.totalShifts > 0
+            ? `<span class="tab-badge">${workSummary.history.totalShifts}件</span>`
+            : ''}
         </button>
       </nav>
       <nav class="nav-section">

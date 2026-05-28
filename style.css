@@ -1142,3 +1142,37 @@ body {
   color: var(--color-text-2);
   margin-top: 2px;
 }
+
+/* ---- 勤務実態テーブル ---- */
+.work-history-table {
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.work-history-row {
+  display: grid;
+  grid-template-columns: 1fr 56px 72px 96px;
+  gap: 8px;
+  padding: 9px 14px;
+  border-bottom: 0.5px solid var(--color-border);
+  font-size: 13px;
+  align-items: center;
+}
+
+.work-history-row:last-child { border-bottom: none; }
+
+.work-history-header {
+  background: var(--color-bg);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-3);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.work-month  { font-weight: 500; color: var(--color-text-1); }
+.work-shifts { color: var(--color-text-2); text-align: center; }
+.work-time   { color: var(--color-text-2); font-variant-numeric: tabular-nums; }
+.work-salary { color: var(--color-primary); font-weight: 500; text-align: right; }
