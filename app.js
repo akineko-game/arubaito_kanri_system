@@ -592,19 +592,24 @@ function renderMainView() {
 function highlightNextTab() {
   /* renderSidebar() の後に呼ぶので、DOM上のnav-tabが確定している */
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('next-target'));
+  const role = appState.currentRole;
+  // 打刻系のタブIDはロールによって異なる
+  const clockTabId = (role === ROLES.MANAGER || role === ROLES.ADMIN) ? 'tab-my-clock' : 'tab-attendance';
+  const attendTabId = (role === ROLES.MANAGER || role === ROLES.ADMIN) ? 'tab-attendance' : 'tab-attendance';
+
   const map = {
     [STATES.LOGGED_OUT]:          'tab-login',
     [STATES.SHIFT_REQ_PENDING]:   'tab-shift-req',
     [STATES.SHIFT_CREATING]:      'tab-shift-mgmt',
     [STATES.SHIFT_CONFIRMED]:     'tab-shift-mgmt',
     [STATES.SHIFT_PUBLISHED]:     'tab-shift-check',
-    [STATES.PRE_WORK]:            'tab-attendance',
-    [STATES.WORKING]:             'tab-attendance',
-    [STATES.ON_BREAK]:            'tab-attendance',
-    [STATES.OVERTIME_APPLYING]:   'tab-attendance',
+    [STATES.PRE_WORK]:            clockTabId,
+    [STATES.WORKING]:             clockTabId,
+    [STATES.ON_BREAK]:            clockTabId,
+    [STATES.OVERTIME_APPLYING]:   clockTabId,
     [STATES.ABSENCE_APPLYING]:    'tab-absence',
     [STATES.REPLACEMENT_OPEN]:    'tab-replace',
-    [STATES.ATTENDANCE_PENDING]:  'tab-attendance',
+    [STATES.ATTENDANCE_PENDING]:  attendTabId,
     [STATES.SALARY_PENDING]:      'tab-salary',
     [STATES.NOTIFY_FAILED]:       'tab-notify',
   };
