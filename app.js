@@ -2737,13 +2737,20 @@ window.ShiftAPI = {
         w('confirmedShifts: 存在しないstaffId=' + c.staffId);
     });
 
-    // 2. 出勤中なのにclockInがない
-    DEMO.staff.filter(s => s.state === '出勤中' || s.state === '休憩中').forEach(s => {
+    // 2. 出勤中なのにclockInがない（アルバイトのみ対象）
+    DEMO.staff.filter(s =>
+      s.role === 'part_time' &&
+      (s.state === '出勤中' || s.state === '休憩中')
+    ).forEach(s => {
       if (!s.clockIn) w(s.name + ': 出勤中/休憩中なのにclockInがない');
     });
 
-    // 3. 退勤しているのにclockOutがない（勤怠未確定・給与未計算）
-    DEMO.staff.filter(s => s.state === '勤怠未確定' || s.state === '給与未計算').forEach(s => {
+    // 3. 退勤しているのにclockOutがない（アルバイトのみ対象）
+    //    管理者・店長は自分が打刻していなくても勤怠未確定・給与未計算になりうる
+    DEMO.staff.filter(s =>
+      s.role === 'part_time' &&
+      (s.state === '勤怠未確定' || s.state === '給与未計算')
+    ).forEach(s => {
       if (!s.clockOut) w(s.name + ': ' + s.state + 'なのにclockOutがない');
     });
 
