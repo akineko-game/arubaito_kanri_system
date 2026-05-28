@@ -2146,6 +2146,20 @@ function showTimeline(mode) {
     defaultDate = demoBaseDate;
   }
 
+  // 当日モードは日付入力なし・todayStrを直接渡す
+  if (mode === 'today') {
+    mainView.innerHTML = `
+      <div class="view-card">
+        <h2 class="view-title"><i class="ti ti-timeline"></i> シフトタイムライン（当日）</h2>
+        <div class="info-row"><span class="info-label">店舗</span><span class="staff-name-chip">${me.store}</span></div>
+        <div class="info-row"><span class="info-label">日付</span><span style="font-weight:600">${todayStr}</span></div>
+        <div id="timeline-body" style="margin-top:12px"></div>
+      </div>`;
+    renderTimelineFor(todayStr, me.store);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
   mainView.innerHTML = `
     <div class="view-card">
       <h2 class="view-title"><i class="ti ti-timeline"></i> シフトタイムライン（${rangeLabel}）</h2>
@@ -2157,7 +2171,6 @@ function showTimeline(mode) {
         <label>日付選択</label>
         <input type="date" id="timeline-date"
           value="${defaultDate}" min="${minDate}" max="${maxDate}"
-          ${mode === 'today' ? 'readonly style="background:var(--color-bg);opacity:.7"' : ''}
           oninput="renderTimelineFor(this.value, '${me.store}')" />
       </div>
       <div id="timeline-body" style="margin-top:12px"></div>
