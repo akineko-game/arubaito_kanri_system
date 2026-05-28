@@ -558,6 +558,40 @@ function transition(eventName, payload = {}) {
   return true;
 }
 
+// ─── 打刻可否制御 ─────────────────────────
+function updateClockButtons() {
+    const staff = appState.currentStaff;
+    if (!staff) return;
+
+    const todayShift = findShiftForStaffByDate(staff?.id, getTodayISO());
+    const storeOpen = getStoreState(staff.store) === STORE_STATES.OPEN;
+
+    const canClockIn = appState.currentState === STATES.PRE_WORK && todayShift !== null && storeOpen;
+    const canBreakStart = appState.currentState === STATES.WORKING && todayShift !== null && storeOpen;
+    const canBreakEnd = appState.currentState === STATES.ON_BREAK && todayShift !== null && storeOpen;
+    const canClockOut = appState.currentState === STATES.WORKING && todayShift !== null && storeOpen;
+
+    const btnClockIn = document.getElementById('btn-clock-in');
+    const btnBreakStart = document.getElementById('btn-break-start');
+    const btnBreakEnd = document.getElementById('btn-break-end');
+    const btnClockOut = document.getElementById('btn-clock-out');
+
+    if(btnClockIn) btnClockIn.disabled = !canClockIn;
+    if(btnBreakStart) btnBreakStart.disabled = !canBreakStart;
+    if(btnBreakEnd) btnBreakEnd.disabled = !canBreakEnd;
+    if(btnClockOut) btnClockOut.disabled = !canClockOut;
+}
+
+// 状態変更時に更新
+const old_transition = transition;
+transition = function(eventName, payload = {}) {
+    const result = old_transition(eventName, payload);
+    updateClockButtons();
+    return result;
+}
+
+
+
 /* ─── 各操作の実処理 ─── */
 function doLogin({ staffId, password }) {
   if (appState.loginFailures >= RULES.MAX_LOGIN_FAILURES) {
@@ -3363,3 +3397,6 @@ updateGuideOnStateChange = function() {
 
 
 /* BUILD_VERSION: 20260528_today_shift_actual */
+
+
+/* BUILD_VERSION: 20260528_clock_restrict_shift */
