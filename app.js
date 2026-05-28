@@ -2451,11 +2451,7 @@ function jumpToMyWork() {
   if (!s) return;
 
   // 打刻データを正として状態を決定（stateより打刻データを優先）
-  if (s.clockIn && s.clockOut) {
-    // 退勤済み → 勤怠未確定
-    appState.currentState = STATES.ATTENDANCE_PENDING;
-    updateStaff({ state: STATES.ATTENDANCE_PENDING });
-  } else if (s.clockIn && !s.clockOut) {
+  if (s.clockIn && !s.clockOut) {
     // 出勤打刻済・退勤前 → 休憩中か出勤中
     if (appState.currentState !== STATES.ON_BREAK) {
       appState.currentState = STATES.WORKING;
@@ -2463,12 +2459,15 @@ function jumpToMyWork() {
     }
     appState.workStart = appState.workStart || parseHHMM(s.clockIn);
   } else {
-    // 未打刻 → 出勤前
+    // 退勤済み or 未打刻 → 出勤前（打刻タブは常に出勤前を起点とする）
     appState.currentState = STATES.PRE_WORK;
     updateStaff({ state: STATES.PRE_WORK });
   }
 
   updateGuideOnStateChange();
+  // 打刻タブを確実にハイライト
+  document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("next-target"));
+  document.getElementById("tab-my-clock")?.classList.add("next-target");
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -2986,6 +2985,11 @@ function showApprovalPanel(type) {
   const me = appState.currentStaff;
   const mainView = document.getElementById('main-view');
   if (!mainView) return;
+
+  // タブハイライト
+  document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("next-target"));
+  const _tabId = type === "overtime" ? "tab-ot-approve" : "tab-abs-approve";
+  document.getElementById(_tabId)?.classList.add("next-target");
 
   // この店舗のアルバイトを対象に絞る
   const targets = DEMO.staff.filter(s =>
