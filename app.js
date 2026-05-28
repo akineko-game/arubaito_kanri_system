@@ -2295,8 +2295,15 @@ function jumpToState(state) {
   }
 
   if (appState.currentStaff) {
-    appState.currentStaff.state = state;
-    ensureClockConsistencyForStaff(appState.currentStaff, state);
+    // 店長・管理者が勤怠確定・給与計算タブへ移動する場合は
+    // 自分自身の state と打刻データを書き換えない（表示切替のみ）
+    const isMgrAdmin = appState.currentRole === ROLES.MANAGER || appState.currentRole === ROLES.ADMIN;
+    const isViewJump = isMgrAdmin &&
+      (state === STATES.ATTENDANCE_PENDING || state === STATES.SALARY_PENDING);
+    if (!isViewJump) {
+      appState.currentStaff.state = state;
+      ensureClockConsistencyForStaff(appState.currentStaff, state);
+    }
   }
 
   logT('DEMO_JUMP', `デモジャンプ → ${state}`);
