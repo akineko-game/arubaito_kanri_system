@@ -1014,7 +1014,7 @@ function buildView(state) {
           ${reqRows}
         </div>
         <div class="shift-add-form">
-          <div class="form-group"><label>希望日</label><input type="date" id="inp-shift-date" value="2025-08-05" /></div>
+          <div class="form-group"><label>希望日</label><input type="date" id="inp-shift-date" value="${getShiftTargetDefaultDateISO()}" /></div>
           <div class="btn-row">
             <div class="form-group" style="flex:1"><label>開始</label><input type="time" id="inp-shift-start" value="10:00" /></div>
             <div class="form-group" style="flex:1"><label>終了</label><input type="time" id="inp-shift-end"   value="18:00" /></div>
@@ -3332,3 +3332,6 @@ updateGuideOnStateChange = function() {
 
 
 /* BUILD_VERSION: 20260528_shift_deadline_rule_25 */
+
+
+/* BUILD_VERSION: 20260528_shift_default_date_fix */
