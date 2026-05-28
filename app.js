@@ -317,7 +317,7 @@ function doShiftPublish() {
 
 function addShiftRequest() {
   /* 「希望日を追加」ボタン用：重複チェックしてリストに追加するだけ（state遷移なし） */
-  const staffId = appState.currentStaff?.id;
+  const staffId = Number(appState.currentStaff?.id);
   if (!staffId) return;
   const date  = document.getElementById('inp-shift-date')?.value  || '2025-08-05';
   const start = document.getElementById('inp-shift-start')?.value || '10:00';
@@ -2083,22 +2083,36 @@ function showTimeline(mode) {
   const today = new Date();
   const todayStr = today.toISOString().slice(0,10);
 
+  // confirmedShiftsの日付一覧（この店舗）
+  const storeConfirmedDates = (DEMO.confirmedShifts || [])
+    .filter(c => { const st2 = DEMO.staff.find(s => s.id === c.staffId); return st2?.store === me.store; })
+    .map(c => c.date)
+    .sort();
+
+  // デモデータの基準日：確定シフトがあればその最初の日、なければ今日
+  const demoBaseDate = storeConfirmedDates.length > 0 ? storeConfirmedDates[0] : todayStr;
+
   // 日付ピッカーの範囲を決定
   const rangeLabel = { today:'当日', range:'前後30日', future:'今後3ヶ月' }[mode];
   let minDate, maxDate, defaultDate;
   if (mode === 'today') {
-    minDate = maxDate = defaultDate = todayStr;
+    // 「当日」＝確定シフトのある最初の日（デモ用）
+    minDate = maxDate = defaultDate = demoBaseDate;
   } else if (mode === 'range') {
-    const d30 = new Date(today); d30.setDate(d30.getDate() - 30);
-    const d30f = new Date(today); d30f.setDate(d30f.getDate() + 30);
-    minDate = d30.toISOString().slice(0,10);
-    maxDate = d30f.toISOString().slice(0,10);
-    defaultDate = todayStr;
+    // 前後30日：デモ基準日を中心に
+    const base = new Date(demoBaseDate);
+    const dm30 = new Date(base); dm30.setDate(dm30.getDate() - 30);
+    const dp30 = new Date(base); dp30.setDate(dp30.getDate() + 30);
+    minDate = dm30.toISOString().slice(0,10);
+    maxDate = dp30.toISOString().slice(0,10);
+    defaultDate = demoBaseDate;
   } else {
-    const d3m = new Date(today); d3m.setMonth(d3m.getMonth() + 3);
-    minDate = todayStr;
+    // 今後3ヶ月：デモ基準日から
+    const base = new Date(demoBaseDate);
+    const d3m  = new Date(base); d3m.setMonth(d3m.getMonth() + 3);
+    minDate = demoBaseDate;
     maxDate = d3m.toISOString().slice(0,10);
-    defaultDate = todayStr;
+    defaultDate = demoBaseDate;
   }
 
   mainView.innerHTML = `
@@ -2132,9 +2146,14 @@ function renderTimelineFor(dateStr, store) {
   const d   = new Date(dateStr);
   const label = dateStr.slice(5).replace('-','/') + '（' + DOW[d.getDay()] + '）';
   const todayStr = new Date().toISOString().slice(0,10);
-  const isPast   = dateStr < todayStr;
-  const isToday  = dateStr === todayStr;
-  const isFuture = dateStr > todayStr;
+  // デモデータ基準：confirmedShiftsの最初の日を「当日」として扱う
+  const storeConfirmedAll = (DEMO.confirmedShifts || [])
+    .filter(c => { const st2 = DEMO.staff.find(s => s.id === c.staffId); return st2?.store === store; })
+    .map(c => c.date).sort();
+  const demoPivot = storeConfirmedAll[0] || todayStr;
+  const isPast   = dateStr < demoPivot;
+  const isToday  = dateStr === demoPivot;
+  const isFuture = dateStr > demoPivot;
 
   // この日のconfirmedShifts（この店舗）
   const storePartIds = new Set(
@@ -2533,6 +2552,8 @@ function confirmAttendance(staffId) {
 function confirmShift(date, staffId) {
   if (!DEMO.confirmedShifts) DEMO.confirmedShifts = [];
   if (!DEMO.pendingShifts)   DEMO.pendingShifts   = [];
+
+  staffId = Number(staffId); // onclick属性から来る場合に文字列になることがあるため
 
   const store = appState.currentStaff?.store;
   const phase = DEMO.shiftPhase?.[store] || 'creating';
