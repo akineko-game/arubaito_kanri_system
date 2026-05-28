@@ -196,7 +196,7 @@ function transition(eventName, payload = {}) {
         return true;
       }
       break;
-    case 'SHIFT_REQUEST_SUBMIT': doShiftSubmit(payload); break;
+    case 'SHIFT_REQUEST_SUBMIT': if (!doShiftSubmit(payload)) return false; break;
     case 'SHIFT_CONFIRM':        if (!doShiftConfirm()) return false; break;
     case 'SHIFT_PUBLISH':        doShiftPublish(); break;
     case 'CLOCK_IN':           doClockin(); break;
@@ -313,12 +313,15 @@ function addShiftRequest() {
 }
 
 function doShiftSubmit(payload) {
-  /* 「この希望を提出して完了」ボタン用：state を SHIFT_REQ_SUBMITTED へ遷移させる */
+  /* 「提出して完了する」ボタン用：shiftRequestsに1件以上あれば SHIFT_REQ_SUBMITTED へ */
   const staffId = appState.currentStaff?.id;
   const myReqs  = DEMO.shiftRequests.filter(r => r.staffId === staffId);
-  if (myReqs.length === 0) { showError('希望日を1件以上追加してから提出してください'); return false; }
-  const last = myReqs[myReqs.length - 1];
-  updateStaff({ state: STATES.SHIFT_REQ_SUBMITTED, note: `${myReqs.length}件提出済み` });
+  if (myReqs.length === 0) {
+    showError('希望日を1件以上追加してから提出してください');
+    return false;
+  }
+  updateStaff({ note: `${myReqs.length}件提出済み` });
+  return true;
 }
 
 function doClockin() {
