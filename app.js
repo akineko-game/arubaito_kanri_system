@@ -387,44 +387,94 @@ function patchedTransition(eventName, payload = {}) {
 /* ═══════════════════════════════════════
    状態進行モデル
 ═══════════════════════════════════════ */
-const PROGRESS_MODEL = [
-  { state: STATES.LOGGED_OUT,          label: 'ログイン',     icon: 'ti-login' },
-  { state: STATES.SHIFT_REQ_PENDING,   label: '勤務希望提出', icon: 'ti-calendar-event' },
-  { state: STATES.SHIFT_REQ_SUBMITTED, label: '希望提出済',   icon: 'ti-calendar-check' },
-  { state: STATES.SHIFT_CREATING,      label: 'シフト作成',   icon: 'ti-layout-grid' },
-  { state: STATES.SHIFT_CONFIRMED,     label: 'シフト確定',   icon: 'ti-circle-check' },
-  { state: STATES.SHIFT_PUBLISHED,     label: 'シフト公開',   icon: 'ti-eye' },
-  { state: STATES.PRE_WORK,            label: '出勤前',       icon: 'ti-clock' },
-  { state: STATES.WORKING,             label: '出勤中',       icon: 'ti-briefcase' },
-  { state: STATES.ON_BREAK,            label: '休憩中',       icon: 'ti-coffee' },
-  { state: STATES.ATTENDANCE_PENDING,  label: '勤怠確認',     icon: 'ti-clipboard-check' },
-  { state: STATES.SALARY_PENDING,      label: '給与計算',     icon: 'ti-coin' },
-];
+/* ── ロール別進捗モデル ───────────────────────────────
+   アルバイト : 希望提出 → シフト確認 → 出退勤
+   店長       : シフト作成 → 確定・公開 → 勤怠確定
+   管理者     : シフト管理 → 勤怠確定 → 給与計算
+   未ログイン : ログインのみ
+────────────────────────────────────────────────── */
+const PROGRESS_MODELS = {
+  [ROLES.PART_TIME]: [
+    { state: STATES.LOGGED_OUT,          label: 'ログイン',     icon: 'ti-login' },
+    { state: STATES.SHIFT_REQ_PENDING,   label: '希望提出',     icon: 'ti-calendar-event' },
+    { state: STATES.SHIFT_REQ_SUBMITTED, label: '提出済み',     icon: 'ti-calendar-check' },
+    { state: STATES.SHIFT_PUBLISHED,     label: 'シフト確認',   icon: 'ti-eye' },
+    { state: STATES.PRE_WORK,            label: '出勤前',       icon: 'ti-clock' },
+    { state: STATES.WORKING,             label: '出勤中',       icon: 'ti-briefcase' },
+    { state: STATES.ON_BREAK,            label: '休憩中',       icon: 'ti-coffee' },
+    { state: STATES.ATTENDANCE_PENDING,  label: '勤怠確認',     icon: 'ti-clipboard-check' },
+  ],
+  [ROLES.MANAGER]: [
+    { state: STATES.LOGGED_OUT,          label: 'ログイン',     icon: 'ti-login' },
+    { state: STATES.SHIFT_CREATING,      label: 'シフト作成',   icon: 'ti-layout-grid' },
+    { state: STATES.SHIFT_CONFIRMED,     label: 'シフト確定',   icon: 'ti-circle-check' },
+    { state: STATES.SHIFT_PUBLISHED,     label: 'シフト公開',   icon: 'ti-eye' },
+    { state: STATES.PRE_WORK,            label: '自分の打刻',   icon: 'ti-clock' },
+    { state: STATES.ATTENDANCE_PENDING,  label: '勤怠確定',     icon: 'ti-clipboard-check' },
+  ],
+  [ROLES.ADMIN]: [
+    { state: STATES.LOGGED_OUT,          label: 'ログイン',     icon: 'ti-login' },
+    { state: STATES.SHIFT_CREATING,      label: 'シフト管理',   icon: 'ti-layout-grid' },
+    { state: STATES.ATTENDANCE_PENDING,  label: '勤怠確定',     icon: 'ti-clipboard-check' },
+    { state: STATES.SALARY_PENDING,      label: '給与計算',     icon: 'ti-coin' },
+  ],
+  null: [
+    { state: STATES.LOGGED_OUT,          label: 'ログイン',     icon: 'ti-login' },
+  ],
+};
+
+function getProgressModel() {
+  return PROGRESS_MODELS[appState.currentRole] || PROGRESS_MODELS[null];
+}
 
 function getCurrentProgress() {
-  const idx = PROGRESS_MODEL.findIndex(s => s.state === appState.currentState);
-  return { idx, total: PROGRESS_MODEL.length, pct: idx < 0 ? 0 : Math.round(idx / (PROGRESS_MODEL.length - 1) * 100) };
+  const model = getProgressModel();
+  const idx = model.findIndex(s => s.state === appState.currentState);
+  const i = idx < 0 ? 0 : idx;
+  return { idx: i, total: model.length, pct: Math.round(i / Math.max(model.length - 1, 1) * 100), model };
 }
 
 function getNextAction() {
-  const g = {
-    [STATES.LOGGED_OUT]:          { cta: 'ログインしてください',           warn: null },
-    [STATES.SHIFT_REQ_PENDING]:   { cta: '勤務希望を提出してください',     warn: '締切後は編集できません' },
-    [STATES.SHIFT_REQ_SUBMITTED]: { cta: 'シフト確定をお待ちください',     warn: null },
-    [STATES.SHIFT_CREATING]:      { cta: '不足時間帯を確認してください',   warn: null },
-    [STATES.SHIFT_CONFIRMED]:     { cta: 'シフトを公開してください',       warn: null },
-    [STATES.SHIFT_PUBLISHED]:     { cta: '勤務内容を確認してください',     warn: null },
-    [STATES.PRE_WORK]:            { cta: '出勤打刻してください',           warn: appState.wifiConnected ? null : '店舗Wi-Fi未接続' },
-    [STATES.WORKING]:             { cta: '勤務中です',                     warn: overtimeWarn() },
-    [STATES.ON_BREAK]:            { cta: '休憩終了してください',           warn: null },
-    [STATES.OVERTIME_APPLYING]:   { cta: '残業申請を送信してください',     warn: null },
-    [STATES.ABSENCE_APPLYING]:    { cta: '欠勤申請を完了してください',     warn: null },
-    [STATES.REPLACEMENT_OPEN]:    { cta: '代替勤務へ応募してください',     warn: null },
-    [STATES.ATTENDANCE_PENDING]:  { cta: '勤怠を確認してください',         warn: null },
-    [STATES.SALARY_PENDING]:      { cta: '給与計算を実行してください',     warn: null },
-    [STATES.NOTIFY_FAILED]:       { cta: '通知を再送してください',         warn: '通知送信に失敗しています' },
+  const role = appState.currentRole;
+
+  // ロール別CTA
+  const byRole = {
+    [ROLES.PART_TIME]: {
+      [STATES.LOGGED_OUT]:          { cta: 'ログインしてください',         warn: null },
+      [STATES.SHIFT_REQ_PENDING]:   { cta: '勤務希望を提出してください',   warn: '締切後は編集できません' },
+      [STATES.SHIFT_REQ_SUBMITTED]: { cta: 'シフト公開をお待ちください',   warn: null },
+      [STATES.SHIFT_PUBLISHED]:     { cta: '確定シフトを確認してください', warn: null },
+      [STATES.PRE_WORK]:            { cta: '出勤打刻してください',         warn: appState.wifiConnected ? null : '店舗Wi-Fi未接続' },
+      [STATES.WORKING]:             { cta: '勤務中です',                   warn: overtimeWarn() },
+      [STATES.ON_BREAK]:            { cta: '休憩終了してください',         warn: null },
+      [STATES.OVERTIME_APPLYING]:   { cta: '残業申請を送信してください',   warn: null },
+      [STATES.ABSENCE_APPLYING]:    { cta: '欠勤申請を完了してください',   warn: null },
+      [STATES.REPLACEMENT_OPEN]:    { cta: '代替シフトへ応募できます',     warn: null },
+      [STATES.ATTENDANCE_PENDING]:  { cta: '勤怠内容を確認してください',   warn: null },
+    },
+    [ROLES.MANAGER]: {
+      [STATES.LOGGED_OUT]:          { cta: 'ログインしてください',               warn: null },
+      [STATES.SHIFT_CREATING]:      { cta: 'スタッフのシフトを作成してください', warn: null },
+      [STATES.SHIFT_CONFIRMED]:     { cta: 'シフトを公開してください',           warn: null },
+      [STATES.SHIFT_PUBLISHED]:     { cta: 'シフトを公開済みです',               warn: null },
+      [STATES.PRE_WORK]:            { cta: '自分の出勤打刻をしてください',       warn: appState.wifiConnected ? null : '店舗Wi-Fi未接続' },
+      [STATES.WORKING]:             { cta: '勤務中です',                         warn: overtimeWarn() },
+      [STATES.ON_BREAK]:            { cta: '休憩終了してください',               warn: null },
+      [STATES.ATTENDANCE_PENDING]:  { cta: 'スタッフの勤怠を確定してください',   warn: null },
+    },
+    [ROLES.ADMIN]: {
+      [STATES.LOGGED_OUT]:          { cta: 'ログインしてください',             warn: null },
+      [STATES.SHIFT_CREATING]:      { cta: 'シフト管理を確認してください',     warn: null },
+      [STATES.ATTENDANCE_PENDING]:  { cta: 'スタッフの勤怠を確定してください', warn: null },
+      [STATES.SALARY_PENDING]:      { cta: '給与計算を実行してください',       warn: null },
+      [STATES.NOTIFY_FAILED]:       { cta: '通知を再送してください',           warn: '通知送信に失敗しています' },
+      [STATES.PRE_WORK]:            { cta: '自分の出勤打刻をしてください',     warn: null },
+      [STATES.WORKING]:             { cta: '勤務中です',                       warn: overtimeWarn() },
+    },
   };
-  return g[appState.currentState] || { cta: 'Undefined', warn: null };
+
+  const roleGuide = byRole[role] || byRole[ROLES.PART_TIME];
+  return roleGuide[appState.currentState] || { cta: 'ログインしてください', warn: null };
 }
 
 function overtimeWarn() {
@@ -493,21 +543,21 @@ function renderStatePanel() {
 function renderProgressStepper() {
   const el = document.getElementById('progress-stepper');
   if (!el) return;
-  const { idx } = getCurrentProgress();
-  el.innerHTML = PROGRESS_MODEL.map((step, i) => {
+  const { idx, model } = getCurrentProgress();
+  el.innerHTML = model.map((step, i) => {
     const cls = i === idx ? 'step active' : i < idx ? 'step done' : 'step pending';
     const dot = i < idx
       ? `<span class="step-badge"><i class="ti ti-check"></i></span>`
       : `<i class="ti ${step.icon}"></i>`;
     return `<div class="${cls}"><div class="step-dot">${dot}</div><div class="step-label">${step.label}</div></div>`
-           + (i < PROGRESS_MODEL.length - 1 ? '<div class="step-line"></div>' : '');
+           + (i < model.length - 1 ? '<div class="step-line"></div>' : '');
   }).join('');
 }
 
 function renderGuide() {
   const el = document.getElementById('guide-box');
   if (!el) return;
-  const { pct, idx } = getCurrentProgress();
+  const { pct, idx, model } = getCurrentProgress();
   const guide = getNextAction();
   const s = appState.currentStaff;
   const who = s ? `<span class="guide-who">${s.name}さん</span>` : '';
@@ -516,7 +566,7 @@ function renderGuide() {
     <div class="guide-cta">${who}${guide.cta}</div>
     ${warn}
     <div class="guide-progress-bar"><div class="guide-progress-fill" style="width:${pct}%"></div></div>
-    <div class="guide-progress-label">進捗 ${pct}%（ステップ ${idx + 1} / ${PROGRESS_MODEL.length}）</div>`;
+    <div class="guide-progress-label">進捗 ${pct}%（ステップ ${idx + 1} / ${model.length}）</div>`;
 }
 
 function renderMainView() {
