@@ -1100,3 +1100,45 @@ body {
   flex-direction: column;
   gap: 8px;
 }
+
+/* ---- スタッフ詳細パネル ---- */
+.staff-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.staff-detail-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-active-bg);
+  color: var(--color-active);
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.staff-detail-info {
+  flex: 1;
+}
+
+.staff-detail-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.staff-detail-sub {
+  font-size: 13px;
+  color: var(--color-text-2);
+  margin-top: 2px;
+}

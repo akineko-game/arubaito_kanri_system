@@ -1480,7 +1480,9 @@ function renderStaffList() {
         const ot     = s.overtimeMin > 0 ? `<span class="sl-ot">残業${s.overtimeMin}分</span>` : '';
         const active = appState.currentStaff?.id === s.id;
         return `
-          <div class="sl-row sl-row-body ${active ? 'sl-row-active' : ''}" onclick="loginAsStaff(${s.id})" title="${s.name}としてログイン">
+          <div class="sl-row sl-row-body ${active ? 'sl-row-active' : ''}"
+            onclick="${appState.currentRole === ROLES.ADMIN ? 'loginAsStaff' : 'showStaffDetail'}(${s.id})"
+            title="${appState.currentRole === ROLES.ADMIN ? s.name + 'としてログイン' : s.name + 'の詳細を表示'}">
             <span class="sl-name">${s.name}${minor}</span>
             <span class="sl-role">${ROLE_LABEL[s.role]}</span>
             <span class="sl-store">${s.store}</span>
@@ -1494,6 +1496,94 @@ function renderStaffList() {
 }
 
 /* ─── 一覧行クリック → そのスタッフとしてログイン ─── */
+/* ─── スタッフ詳細表示（店長用：クリックしてもログインせず詳細だけ表示） ─── */
+function showStaffDetail(staffId) {
+  const s = DEMO.staff.find(st => st.id === staffId);
+  if (!s) return;
+  const mainView = document.getElementById('main-view');
+  if (!mainView) return;
+
+  const DOW = ['日','月','火','水','木','金','土'];
+
+  // 確定シフト
+  const myShifts = (DEMO.confirmedShifts || [])
+    .filter(c => c.staffId === s.id)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const shiftRows = myShifts.map(c => {
+    const d = new Date(c.date);
+    const label = `${c.date.slice(5).replace('-','/')}(${DOW[d.getDay()]})`;
+    return `<div class="shift-row">
+      <span>${label}</span>
+      <span>${c.start}〜${c.end}</span>
+      <span class="badge-ok">確定済</span>
+    </div>`;
+  }).join('');
+
+  // 状態バッジ
+  const STATE_COLOR = {
+    '未ログイン':       'sl-gray',
+    '勤務希望未提出':   'sl-warn',
+    '勤務希望提出済':   'sl-info',
+    'シフト作成中':     'sl-purple',
+    'シフト確定済':     'sl-purple',
+    'シフト公開済':     'sl-info',
+    '出勤前':           'sl-amber',
+    '出勤中':           'sl-ok',
+    '休憩中':           'sl-teal',
+    '残業申請中':       'sl-warn',
+    '欠勤申請中':       'sl-error',
+    '代替募集中':       'sl-error',
+    '勤怠未確定':       'sl-amber',
+    '給与未計算':       'sl-info',
+    '通知送信失敗':     'sl-error',
+  };
+  const stateClass = STATE_COLOR[s.state] || 'sl-gray';
+
+  // 打刻状況
+  const clockInfo = s.clockIn
+    ? `出勤 ${s.clockIn}${s.clockOut ? ' → 退勤 ' + s.clockOut : ' →（勤務中）'}`
+    : '未打刻';
+
+  mainView.innerHTML = `
+    <div class="view-card">
+      <h2 class="view-title"><i class="ti ti-user"></i> スタッフ詳細</h2>
+
+      <div class="staff-detail-header">
+        <div class="staff-detail-avatar">${s.name.slice(0,1)}</div>
+        <div class="staff-detail-info">
+          <div class="staff-detail-name">${s.name} ${s.isMinor ? '<span class="sl-minor">未成年</span>' : ''}</div>
+          <div class="staff-detail-sub">${s.store} ／ アルバイト ／ ¥${s.hourlyRate || '—'}/時</div>
+        </div>
+        <span class="sl-badge ${stateClass}" style="align-self:center">${s.state}</span>
+      </div>
+
+      <div class="info-row"><span class="info-label">打刻</span><span>${clockInfo}</span></div>
+      ${s.breakMin > 0 ? `<div class="info-row"><span class="info-label">休憩累計</span><span>${s.breakMin}分</span></div>` : ''}
+      ${s.overtimeMin > 0 ? `<div class="info-row"><span class="info-label">残業</span><span class="warn-text">${s.overtimeMin}分</span></div>` : ''}
+      <div class="info-row"><span class="info-label">メモ</span><span class="sl-note">${s.note || '—'}</span></div>
+
+      <div style="margin-top:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--color-text-3);letter-spacing:0.05em;text-transform:uppercase;margin-bottom:8px">
+          確定シフト
+        </div>
+        ${myShifts.length > 0
+          ? `<div class="shift-table">
+              <div class="shift-row header"><span>日付</span><span>時間</span><span>状態</span></div>
+              ${shiftRows}
+            </div>`
+          : '<div class="warn-box"><i class="ti ti-info-circle"></i> 確定シフトなし</div>'
+        }
+      </div>
+
+      <button class="btn-ghost" onclick="renderMainView()" style="margin-top:4px">
+        <i class="ti ti-arrow-left"></i> 戻る
+      </button>
+    </div>`;
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function loginAsStaff(staffId) {
   const staff = DEMO.staff.find(s => s.id === staffId);
   if (!staff) return;
