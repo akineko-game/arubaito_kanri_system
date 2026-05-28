@@ -1851,15 +1851,68 @@ function showAbsencePanel() {
 function showReplacementPanel() {
   const me = appState.currentStaff;
   if (!me) return;
-  // 自分が募集中なら自分の状態画面、そうでなければ応募画面
+  const mainView = document.getElementById('main-view');
+  if (!mainView) return;
+
+  const DOW = ['日','月','火','水','木','金','土'];
+
+  // 自分が欠勤承認済み（REPLACEMENT_OPEN）の場合 → 自分のシフトの募集状況
   if (me.state === STATES.REPLACEMENT_OPEN) {
-    appState.currentState = STATES.REPLACEMENT_OPEN;
+    const myReqs = DEMO.shiftRequests.filter(r => r.staffId === me.id);
+    const shiftInfo = myReqs.length > 0
+      ? (() => { const r = myReqs[0]; const d = new Date(r.date); return `${r.date.slice(5).replace('-','/')}(${DOW[d.getDay()]}) ${r.start}〜${r.end}`; })()
+      : '未定';
+    mainView.innerHTML = `
+      <div class="view-card">
+        <h2 class="view-title"><i class="ti ti-repeat"></i> 代替募集中（自分のシフト）</h2>
+        <div class="info-row"><span class="info-label">スタッフ</span><span class="staff-name-chip">${me.name}（${me.store}）</span></div>
+        <div class="warn-box"><i class="ti ti-info-circle"></i> あなたの欠勤が承認され、代替スタッフを募集しています</div>
+        <div class="info-row"><span class="info-label">募集シフト</span><span>${shiftInfo}</span></div>
+        <div class="info-row"><span class="info-label">応募状況</span><span class="badge-warn">募集中</span></div>
+        <p class="hint">店長が代替スタッフを決定次第、通知されます。</p>
+      </div>`;
   } else {
-    // 応募者として見る：currentStateをREPLACEMENT_OPENにすると
-    // buildViewが「応募する側」として表示する
-    appState.currentState = STATES.REPLACEMENT_OPEN;
+    // それ以外 → 同じ店舗の代替募集中シフトに応募する画面
+    const openSlots = DEMO.staff.filter(s =>
+      s.store === me.store &&
+      s.state === STATES.REPLACEMENT_OPEN &&
+      s.id !== me.id
+    );
+    const slotRows = openSlots.flatMap(absent => {
+      const reqs = DEMO.shiftRequests.filter(r => r.staffId === absent.id);
+      return reqs.map(r => {
+        const d = new Date(r.date);
+        const label = `${r.date.slice(5).replace('-','/')}(${DOW[d.getDay()]})`;
+        return `
+          <div class="approval-row">
+            <div class="approval-info">
+              <span class="approval-name">${label} ${r.start}〜${r.end}</span>
+              <span class="approval-detail">${absent.store} ／ 時給 ¥${absent.hourlyRate || '—'}</span>
+              <span class="approval-note">欠員：${absent.name}さんの代替</span>
+            </div>
+            <div class="approval-btns">
+              <button class="btn-primary" onclick="applyReplacement(${absent.id}, '${r.date}')">応募する</button>
+            </div>
+          </div>`;
+      });
+    }).join('');
+
+    mainView.innerHTML = `
+      <div class="view-card">
+        <h2 class="view-title"><i class="ti ti-repeat"></i> 代替シフト応募</h2>
+        <div class="info-row"><span class="info-label">スタッフ</span><span class="staff-name-chip">${me.name}（${me.store}）</span></div>
+        <div class="info-row">
+          <span class="info-label">募集中件数</span>
+          <span class="${openSlots.length > 0 ? 'badge-warn' : 'badge-ok'}">${openSlots.length}件</span>
+        </div>
+        ${openSlots.length > 0
+          ? `<div class="approval-list" style="margin-top:8px">${slotRows}</div>`
+          : '<div class="badge-success-lg">現在、代替募集中のシフトはありません</div>'
+        }
+        <p class="hint">応募後、店長が確定します。</p>
+      </div>`;
   }
-  updateGuideOnStateChange();
+
   window.scrollTo({ top: 0, behavior: 'smooth' });
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('next-target'));
   const tabEl = document.getElementById('tab-replace');
