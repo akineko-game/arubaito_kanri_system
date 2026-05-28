@@ -1955,6 +1955,19 @@ function renderSidebar() {
           <i class="ti ti-calendar-x"></i>欠勤承認
         </button>
       </nav>
+      </nav>
+      <nav class="nav-section">
+        <div class="nav-section-label">シフトタイムライン</div>
+        <button class="nav-tab" id="tab-timeline-today" onclick="showTimeline('today')">
+          <i class="ti ti-timeline"></i>当日
+        </button>
+        <button class="nav-tab" id="tab-timeline-range" onclick="showTimeline('range')">
+          <i class="ti ti-calendar-search"></i>前後30日
+        </button>
+        <button class="nav-tab" id="tab-timeline-future" onclick="showTimeline('future')">
+          <i class="ti ti-calendar-stats"></i>今後3ヶ月
+        </button>
+      </nav>
       <nav class="nav-section">
         <div class="nav-section-label">その他</div>
         <button class="nav-tab" id="tab-notify" onclick="jumpToState('通知送信失敗')">
@@ -2055,6 +2068,186 @@ function gotoShiftPhase(forceCreating) {
 }
 
 /* ─── 代替応募パネル表示（サイドバーボタン用） ─── */
+/* ─── シフトタイムライン（店長用） ─── */
+function showTimeline(mode) {
+  const me = appState.currentStaff;
+  if (!me) return;
+  const mainView = document.getElementById('main-view');
+  if (!mainView) return;
+
+  // タブ強調
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('next-target'));
+  const tabId = { today:'tab-timeline-today', range:'tab-timeline-range', future:'tab-timeline-future' }[mode];
+  document.getElementById(tabId)?.classList.add('next-target');
+
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0,10);
+
+  // 日付ピッカーの範囲を決定
+  const rangeLabel = { today:'当日', range:'前後30日', future:'今後3ヶ月' }[mode];
+  let minDate, maxDate, defaultDate;
+  if (mode === 'today') {
+    minDate = maxDate = defaultDate = todayStr;
+  } else if (mode === 'range') {
+    const d30 = new Date(today); d30.setDate(d30.getDate() - 30);
+    const d30f = new Date(today); d30f.setDate(d30f.getDate() + 30);
+    minDate = d30.toISOString().slice(0,10);
+    maxDate = d30f.toISOString().slice(0,10);
+    defaultDate = todayStr;
+  } else {
+    const d3m = new Date(today); d3m.setMonth(d3m.getMonth() + 3);
+    minDate = todayStr;
+    maxDate = d3m.toISOString().slice(0,10);
+    defaultDate = todayStr;
+  }
+
+  mainView.innerHTML = `
+    <div class="view-card">
+      <h2 class="view-title"><i class="ti ti-timeline"></i> シフトタイムライン（${rangeLabel}）</h2>
+      <div class="info-row">
+        <span class="info-label">店舗</span>
+        <span class="staff-name-chip">${me.store}</span>
+      </div>
+      <div class="form-group" style="margin-top:8px">
+        <label>日付選択</label>
+        <input type="date" id="timeline-date"
+          value="${defaultDate}" min="${minDate}" max="${maxDate}"
+          ${mode === 'today' ? 'readonly style="background:var(--color-bg);opacity:.7"' : ''}
+          oninput="renderTimelineFor(this.value, '${me.store}')" />
+      </div>
+      <div id="timeline-body" style="margin-top:12px"></div>
+    </div>`;
+
+  // 初期描画
+  renderTimelineFor(defaultDate, me.store);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* 指定日・指定店舗のタイムラインを描画 */
+function renderTimelineFor(dateStr, store) {
+  const el = document.getElementById('timeline-body');
+  if (!el || !dateStr) return;
+
+  const DOW = ['日','月','火','水','木','金','土'];
+  const d   = new Date(dateStr);
+  const label = dateStr.slice(5).replace('-','/') + '（' + DOW[d.getDay()] + '）';
+  const todayStr = new Date().toISOString().slice(0,10);
+  const isPast   = dateStr < todayStr;
+  const isToday  = dateStr === todayStr;
+  const isFuture = dateStr > todayStr;
+
+  // この日のconfirmedShifts（この店舗）
+  const storePartIds = new Set(
+    DEMO.staff.filter(s => s.role === ROLES.PART_TIME && s.store === store).map(s => s.id)
+  );
+  const dayShifts = (DEMO.confirmedShifts || [])
+    .filter(c => c.date === dateStr && storePartIds.has(c.staffId))
+    .map(c => {
+      const st = DEMO.staff.find(s => s.id === c.staffId);
+      return { ...c, name: st?.name || '?', clockIn: st?.clockIn, clockOut: st?.clockOut, state: st?.state, hourlyRate: st?.hourlyRate };
+    })
+    .sort((a, b) => a.start.localeCompare(b.start));
+
+  if (dayShifts.length === 0) {
+    el.innerHTML = '<div class="warn-box"><i class="ti ti-info-circle"></i> ' + label + ' の確定シフトはありません</div>';
+    return;
+  }
+
+  // タイムライン描画（6:00〜24:00）
+  const START_H = 6, END_H = 24, TOTAL_H = END_H - START_H;
+  const BAR_W = 100; // %
+
+  // 時間軸ヘッダー
+  const hourTicks = [];
+  for (let h = START_H; h <= END_H; h += 2) {
+    const pct = (h - START_H) / TOTAL_H * 100;
+    hourTicks.push(`<div class="tl-tick" style="left:${pct}%">${h}:00</div>`);
+  }
+
+  // 現在時刻ライン（当日のみ）
+  let nowLine = '';
+  if (isToday) {
+    const now = new Date();
+    const nowH = now.getHours() + now.getMinutes() / 60;
+    if (nowH >= START_H && nowH <= END_H) {
+      const pct = (nowH - START_H) / TOTAL_H * 100;
+      nowLine = `<div class="tl-now-line" style="left:${pct}%"><div class="tl-now-label">NOW</div></div>`;
+    }
+  }
+
+  // シフトバー
+  const bars = dayShifts.map(s => {
+    const [sh, sm] = s.start.split(':').map(Number);
+    const [eh, em] = s.end.split(':').map(Number);
+    const startPct = Math.max(0, (sh + sm/60 - START_H) / TOTAL_H * 100);
+    const endPct   = Math.min(100, (eh + em/60 - START_H) / TOTAL_H * 100);
+    const widthPct = endPct - startPct;
+
+    // 状態に応じた色
+    let barColor = 'var(--color-primary)';
+    let barOpacity = '1';
+    let statusMark = '';
+    if (isFuture) { barColor = '#9ab8d8'; barOpacity = '0.8'; }
+    if (isToday || isPast) {
+      if (s.state === '出勤中' || s.state === '休憩中') { barColor = '#2d7a4f'; statusMark = ' 🟢'; }
+      else if (s.clockOut) { barColor = '#888'; statusMark = ' ✓'; }
+      else if (s.state === '欠勤申請中' || s.state === '代替募集中') { barColor = '#a32d2d'; barOpacity='0.7'; statusMark = ' ✗欠'; }
+    }
+
+    // 実打刻バー（当日・過去）
+    let actualBar = '';
+    if ((isToday || isPast) && s.clockIn) {
+      const [aih, aim] = s.clockIn.split(':').map(Number);
+      const aeh = s.clockOut ? s.clockOut.split(':').map(Number) : [new Date().getHours(), new Date().getMinutes()];
+      const actualStart = Math.max(0, (aih + aim/60 - START_H) / TOTAL_H * 100);
+      const actualEnd   = Math.min(100, (aeh[0] + aeh[1]/60 - START_H) / TOTAL_H * 100);
+      const actualW     = actualEnd - actualStart;
+      if (actualW > 0) {
+        actualBar = `<div class="tl-actual-bar" style="left:${actualStart}%;width:${actualW}%;background:${barColor};opacity:.35"></div>`;
+      }
+    }
+
+    return `
+      <div class="tl-row">
+        <div class="tl-name">${s.name}${statusMark}</div>
+        <div class="tl-track">
+          ${actualBar}
+          <div class="tl-shift-bar" style="left:${startPct}%;width:${widthPct}%;background:${barColor};opacity:${barOpacity}"
+            title="${s.name}: ${s.start}〜${s.end}">
+            <span class="tl-shift-label">${s.start}〜${s.end}</span>
+          </div>
+        </div>
+        <div class="tl-info">${s.hourlyRate ? '¥'+s.hourlyRate : '—'}</div>
+      </div>`;
+  }).join('');
+
+  // 集計
+  const totalStaff = dayShifts.length;
+  const working    = dayShifts.filter(s => s.state === '出勤中' || s.state === '休憩中').length;
+  const done       = dayShifts.filter(s => s.clockOut).length;
+
+  el.innerHTML = `
+    <div class="tl-header-row">
+      <span class="tl-date-label">${label}</span>
+      <div class="tl-stats">
+        <span class="badge-ok" style="font-size:11px">${totalStaff}名配置</span>
+        ${isToday ? '<span class="badge-ok" style="font-size:11px">出勤中 '+working+'名</span>' : ''}
+        ${isPast  ? '<span class="badge-warn" style="font-size:11px">退勤済 '+done+'名</span>' : ''}
+        ${isFuture? '<span class="sl-info" style="font-size:11px;padding:2px 8px;border-radius:10px">予定</span>' : ''}
+      </div>
+    </div>
+    <div class="tl-container">
+      <div class="tl-axis">${hourTicks.join('')}</div>
+      <div class="tl-body">
+        ${nowLine}
+        ${bars}
+      </div>
+    </div>
+    <p class="hint" style="margin-top:8px">
+      ${isToday ? '■ 濃い色 = 実打刻実績　□ 薄い色 = シフト予定' : isFuture ? '予定シフトの表示です' : '過去のシフト実績'}
+    </p>`;
+}
+
 /* ─── 欠勤申請パネル（サイドバーボタン用・状態を変えない） ─── */
 function showAbsencePanel() {
   const me = appState.currentStaff;
@@ -2434,6 +2627,85 @@ window.ShiftAPI = {
     });
     appState.transitionLog = [];
     updateGuideOnStateChange();
+  },
+
+  /* データスナップショット（テストログ用） */
+  snapshot: () => ({
+    ts: new Date().toISOString(),
+    appState: {
+      currentState: appState.currentState,
+      currentRole:  appState.currentRole,
+      currentStaff: appState.currentStaff ? { id: appState.currentStaff.id, name: appState.currentStaff.name } : null,
+    },
+    staff: DEMO.staff.map(s => ({
+      id: s.id, name: s.name, role: s.role, store: s.store,
+      state: s.state, clockIn: s.clockIn, clockOut: s.clockOut,
+      breakMin: s.breakMin, overtimeMin: s.overtimeMin, note: s.note,
+    })),
+    shiftRequests:   [...DEMO.shiftRequests],
+    confirmedShifts: [...(DEMO.confirmedShifts || [])],
+    pendingShifts:   [...(DEMO.pendingShifts   || [])],
+    shiftPhase:      { ...(DEMO.shiftPhase     || {}) },
+    transitionLog:   appState.transitionLog.slice(0, 20),
+  }),
+
+  /* 整合性チェック（テスト終了時に自動検証） */
+  integrityCheck: () => {
+    const errors = [];
+    const w = (msg) => errors.push(msg);
+
+    // 1. confirmedShiftsのstaffIdは実在するか
+    (DEMO.confirmedShifts || []).forEach(c => {
+      if (!DEMO.staff.find(s => s.id === c.staffId))
+        w('confirmedShifts: 存在しないstaffId=' + c.staffId);
+    });
+
+    // 2. 出勤中なのにclockInがない
+    DEMO.staff.filter(s => s.state === '出勤中' || s.state === '休憩中').forEach(s => {
+      if (!s.clockIn) w(s.name + ': 出勤中/休憩中なのにclockInがない');
+    });
+
+    // 3. 退勤しているのにclockOutがない（勤怠未確定・給与未計算）
+    DEMO.staff.filter(s => s.state === '勤怠未確定' || s.state === '給与未計算').forEach(s => {
+      if (!s.clockOut) w(s.name + ': ' + s.state + 'なのにclockOutがない');
+    });
+
+    // 4. clockIn > clockOut（時刻逆転）
+    DEMO.staff.filter(s => s.clockIn && s.clockOut).forEach(s => {
+      const [ih,im] = s.clockIn.split(':').map(Number);
+      const [oh,om] = s.clockOut.split(':').map(Number);
+      if (ih*60+im >= oh*60+om) w(s.name + ': clockIn(' + s.clockIn + ') >= clockOut(' + s.clockOut + ')');
+    });
+
+    // 5. 公開済みフェーズなのにconfirmedShiftsが空
+    Object.entries(DEMO.shiftPhase || {}).forEach(([store, phase]) => {
+      if (phase === 'published') {
+        const ok = (DEMO.confirmedShifts || []).some(c => {
+          const st = DEMO.staff.find(s => s.id === c.staffId);
+          return st?.store === store;
+        });
+        if (!ok) w(store + ': shiftPhase=publishedなのにconfirmedShiftsが空');
+      }
+    });
+
+    // 6. 未成年者が深夜帯のシフトに割り当てられていないか
+    (DEMO.confirmedShifts || []).forEach(c => {
+      const st = DEMO.staff.find(s => s.id === c.staffId);
+      if (st?.isMinor) {
+        const [eh] = c.end.split(':').map(Number);
+        if (eh >= 22 || eh < 5) w(st.name + ': 未成年者が深夜シフト(' + c.end + ')に割り当て');
+      }
+    });
+
+    // 7. shiftRequestsに重複（同staffId・同date）
+    const reqKeys = {};
+    DEMO.shiftRequests.forEach(r => {
+      const k = r.staffId + '_' + r.date;
+      if (reqKeys[k]) w('shiftRequests: 重複 staffId=' + r.staffId + ' date=' + r.date);
+      reqKeys[k] = true;
+    });
+
+    return { ok: errors.length === 0, errors };
   },
 
   /* イベント通知（テストランナーが購読できる） */
