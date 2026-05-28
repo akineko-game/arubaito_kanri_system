@@ -159,8 +159,9 @@
   <span class="header-title">テストランナー</span>
   <span style="font-size:11px;color:var(--text-3)">アルバイト管理統合システム</span>
   <div class="header-spacer"></div>
-  <button class="btn btn-custom" onclick="showLogPanel()" id="btn-log" style="opacity:.5" title="システムログ">
-    <i class="ti ti-file-description"></i> ログ
+  <button class="btn" onclick="showLogPanel()" id="btn-log"
+    style="background:#faeeda;color:#b07010;border:.5px solid #b07010;opacity:.4;transition:all .2s" title="テスト実行後にログを確認できます">
+    <i class="ti ti-file-description"></i> ログ確認・DL
   </button>
   <div class="speed-wrap">
     <i class="ti ti-gauge"></i>間隔
@@ -757,7 +758,12 @@ function runScenario() {
   const title = g ? g.scenarios[currentScenIdx].title : 'カスタム';
   sysLog = { scenarioTitle: title, startTime: new Date().toISOString(), endTime: null, steps: [], integrityBefore: null, integrityAfter: null };
   sysLog.integrityBefore = API.integrityCheck();
-  document.getElementById('btn-log').style.opacity = '1';
+  const btnLog = document.getElementById('btn-log');
+  btnLog.style.opacity     = '1';
+  btnLog.style.background  = '#eaf3de';
+  btnLog.style.color       = '#2d7a4f';
+  btnLog.style.borderColor = '#2d7a4f';
+  btnLog.title = 'ログを確認・ダウンロードできます（クリック）';
   document.getElementById('log-scenario-title').textContent = title;
 
   running = true; paused = false; stopped = false;
