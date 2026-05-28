@@ -171,6 +171,7 @@ let appState = {
   workStart:     null,   // Date オブジェクト
   breakStart:    null,   // Date オブジェクト
   transitionLog: [],
+  clockViewMode: false,  // 打刻タブ表示中フラグ（currentStateを汚さずにUI切替）
 };
 
 /* ═══════════════════════════════════════
@@ -574,10 +575,22 @@ function updateClockButtons() {
     // アルバイトはシフト必須、店長・管理者はシフト不問
     const shiftOk = isPartTime ? todayShift !== null : true;
 
-    const canClockIn   = appState.currentState === STATES.PRE_WORK   && shiftOk && storeOpen;
-    const canBreakStart= appState.currentState === STATES.WORKING     && shiftOk && storeOpen;
-    const canBreakEnd  = appState.currentState === STATES.ON_BREAK    && shiftOk && storeOpen;
-    const canClockOut  = appState.currentState === STATES.WORKING     && shiftOk && storeOpen;
+    // clockViewMode 中は実打刻データから判定する状態を使う
+    let evalState = appState.currentState;
+    if (appState.clockViewMode && (appState.currentRole === ROLES.MANAGER || appState.currentRole === ROLES.ADMIN)) {
+      if (staff.clockIn && !staff.clockOut) {
+        evalState = appState.currentState === STATES.ON_BREAK ? STATES.ON_BREAK : STATES.WORKING;
+      } else if (staff.clockOut) {
+        evalState = STATES.ATTENDANCE_PENDING;
+      } else {
+        evalState = STATES.PRE_WORK;
+      }
+    }
+
+    const canClockIn   = evalState === STATES.PRE_WORK   && shiftOk && storeOpen;
+    const canBreakStart= evalState === STATES.WORKING     && shiftOk && storeOpen;
+    const canBreakEnd  = evalState === STATES.ON_BREAK    && shiftOk && storeOpen;
+    const canClockOut  = evalState === STATES.WORKING     && shiftOk && storeOpen;
 
     const btnClockIn = document.getElementById('btn-clock-in');
     const btnBreakStart = document.getElementById('btn-break-start');
@@ -1005,13 +1018,34 @@ function renderGuide() {
 function renderMainView() {
   const el = document.getElementById('main-view');
   if (!el) return;
-  el.innerHTML = buildView(appState.currentState);
+  // clockViewMode 中は打刻UI（実打刻データに基づく状態）を表示する
+  let viewState = appState.currentState;
+  if (appState.clockViewMode) {
+    const s = appState.currentStaff;
+    if (s) {
+      if (s.clockIn && !s.clockOut) {
+        viewState = appState.currentState === STATES.ON_BREAK ? STATES.ON_BREAK : STATES.WORKING;
+      } else if (s.clockOut) {
+        viewState = STATES.ATTENDANCE_PENDING;
+      } else {
+        viewState = STATES.PRE_WORK;
+      }
+    }
+  }
+  el.innerHTML = buildView(viewState);
   bindViewEvents();
 }
 
 function highlightNextTab() {
   /* renderSidebar() の後に呼ぶので、DOM上のnav-tabが確定している */
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('next-target'));
+
+  // 打刻タブ表示中はtab-my-clockを常にハイライト
+  if (appState.clockViewMode) {
+    document.getElementById('tab-my-clock')?.classList.add('next-target');
+    return;
+  }
+
   const role = appState.currentRole;
   // 打刻系のタブIDはロールによって異なる
   const clockTabId = (role === ROLES.MANAGER || role === ROLES.ADMIN) ? 'tab-my-clock' : 'tab-attendance';
@@ -1918,6 +1952,7 @@ function renderStaffList() {
 /* ─── 一覧行クリック → そのスタッフとしてログイン ─── */
 /* ─── スタッフ詳細表示（店長用：クリックしてもログインせず詳細だけ表示） ─── */
 function showStaffDetail(staffId) {
+  appState.clockViewMode = false;  // 打刻タブ以外への移動でリセット
   const s = DEMO.staff.find(st => st.id === staffId);
   if (!s) return;
   const mainView = document.getElementById('main-view');
@@ -2107,6 +2142,7 @@ function calcWorkSummary(staff) {
 
 /* ─── 勤務実態パネル表示 ─── */
 function showWorkSummary(type) {
+  appState.clockViewMode = false;  // 打刻タブ以外への移動でリセット
   const me = appState.currentStaff;
   if (!me) return;
   const mainView = document.getElementById('main-view');
@@ -2195,6 +2231,7 @@ function showWorkSummary(type) {
 
 /* ─── デモジャンプ（サイドバーボタン用） ─── */
 function jumpToState(state) {
+  appState.clockViewMode = false;  // 打刻タブ以外への移動でリセット
   appState.currentState = state;
 
   if (state !== STATES.LOGGED_OUT && !appState.currentRole) {
@@ -2351,14 +2388,14 @@ function renderSidebar() {
         <button class="nav-tab" id="tab-shift-mgmt" onclick="gotoShiftPhase()">
           <i class="ti ti-layout-grid"></i>シフト割当<span class="tab-badge">確定済</span>
         </button>
-        <button class="nav-tab next-target" onclick="appState.currentState=STATES.SHIFT_CONFIRMED; updateGuideOnStateChange()">
+        <button class="nav-tab next-target" onclick="appState.clockViewMode=false; appState.currentState=STATES.SHIFT_CONFIRMED; updateGuideOnStateChange()">
           <i class="ti ti-send"></i>確定内容確認・公開
         </button>`;
       if (phase === 'published') return `
         <button class="nav-tab" id="tab-shift-mgmt" onclick="gotoShiftPhase()">
           <i class="ti ti-layout-grid"></i>シフト割当<span class="tab-badge">公開済</span>
         </button>
-        <button class="nav-tab done" onclick="appState.currentState=STATES.SHIFT_CONFIRMED; updateGuideOnStateChange()">
+        <button class="nav-tab done" onclick="appState.clockViewMode=false; appState.currentState=STATES.SHIFT_CONFIRMED; updateGuideOnStateChange()">
           <i class="ti ti-send"></i>確定内容<span class="tab-badge">公開済</span>
         </button>`;
       return '';
@@ -2465,18 +2502,13 @@ function jumpToMyWork() {
   const s = appState.currentStaff;
   if (!s) return;
 
-  // 打刻データを正として状態を決定（stateより打刻データを優先）
+  // currentState（業務上の現在地）は変えず、clockViewMode で UI 表示のみ切り替える。
+  // 打刻ボタンの有効/無効判定は clockViewMode 中は実打刻データで行う。
+  appState.clockViewMode = true;
+
+  // workStart の復元（出勤打刻済みの場合）
   if (s.clockIn && !s.clockOut) {
-    // 出勤打刻済・退勤前 → 休憩中か出勤中
-    if (appState.currentState !== STATES.ON_BREAK) {
-      appState.currentState = STATES.WORKING;
-      updateStaff({ state: STATES.WORKING });
-    }
     appState.workStart = appState.workStart || parseHHMM(s.clockIn);
-  } else {
-    // 退勤済み or 未打刻 → 出勤前（打刻タブは常に出勤前を起点とする）
-    appState.currentState = STATES.PRE_WORK;
-    updateStaff({ state: STATES.PRE_WORK });
   }
 
   updateGuideOnStateChange();
@@ -2488,6 +2520,7 @@ function jumpToMyWork() {
 
 /* ─── シフトフェーズに応じた画面へ（店長用） ─── */
 function gotoShiftPhase(forceCreating) {
+  appState.clockViewMode = false;  // 打刻タブ以外への移動でリセット
   const store = appState.currentStaff?.store;
   const phase = getShiftPhase(store);
   if (forceCreating || phase === 'creating') {
@@ -2505,6 +2538,7 @@ function gotoShiftPhase(forceCreating) {
 /* ─── 代替応募パネル表示（サイドバーボタン用） ─── */
 /* ─── シフトタイムライン（店長用） ─── */
 function showTimeline(mode) {
+  appState.clockViewMode = false;  // 打刻タブ以外への移動でリセット
   const me = appState.currentStaff;
   if (!me) return;
   const mainView = document.getElementById('main-view');
@@ -2997,6 +3031,7 @@ function applyReplacement(absentStaffId, date) {
 
 /* ─── 残業承認・欠勤承認パネル（店長用） ─── */
 function showApprovalPanel(type) {
+  appState.clockViewMode = false;  // 打刻タブ以外への移動でリセット
   const me = appState.currentStaff;
   const mainView = document.getElementById('main-view');
   if (!mainView) return;
