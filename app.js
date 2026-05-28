@@ -597,7 +597,7 @@ function highlightNextTab() {
     [STATES.SHIFT_REQ_PENDING]:   'tab-shift-req',
     [STATES.SHIFT_CREATING]:      'tab-shift-mgmt',
     [STATES.SHIFT_CONFIRMED]:     'tab-shift-mgmt',
-    [STATES.SHIFT_PUBLISHED]:     'tab-shift-req',
+    [STATES.SHIFT_PUBLISHED]:     'tab-shift-check',
     [STATES.PRE_WORK]:            'tab-attendance',
     [STATES.WORKING]:             'tab-attendance',
     [STATES.ON_BREAK]:            'tab-attendance',
@@ -1621,7 +1621,7 @@ function renderSidebar() {
         <button class="nav-tab" id="tab-shift-req" onclick="jumpToState('勤務希望未提出')">
           <i class="ti ti-calendar-event"></i>勤務希望
         </button>
-        <button class="nav-tab" onclick="jumpToState('シフト公開済')">
+        <button class="nav-tab" id="tab-shift-check" onclick="jumpToState('シフト公開済')">
           <i class="ti ti-eye"></i>シフト確認
         </button>
         <button class="nav-tab" id="tab-attendance" onclick="jumpToState('出勤前')">
