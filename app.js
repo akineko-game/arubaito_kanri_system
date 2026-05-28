@@ -2389,12 +2389,12 @@ function renderSidebar() {
         <button class="nav-tab" onclick="jumpToState('シフト作成中')">
           <i class="ti ti-layout-grid"></i>シフト管理
         </button>
-        <button class="nav-tab" id="tab-attendance" onclick="jumpToState('勤怠未確定')">
-          <i class="ti ti-clipboard-check"></i>勤怠確定
-        </button>
       </nav>
       <nav class="nav-section">
         <div class="nav-section-label">給与・経理</div>
+        <button class="nav-tab" id="tab-attendance" onclick="jumpToState('勤怠未確定')">
+          <i class="ti ti-clipboard-check"></i>勤怠確定
+        </button>
         <button class="nav-tab" id="tab-salary" onclick="jumpToState('給与未計算')">
           <i class="ti ti-coin"></i>給与計算
         </button>
