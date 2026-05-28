@@ -119,8 +119,10 @@ const DEMO = {
     { id: 50, name: '坂本 ひな',   role: ROLES.PART_TIME,  state: STATES.LOGGED_OUT,          store: '渋谷店', age: 23, hourlyRate: 1180, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '出勤前' },
   ],
   shiftRequests: [],
-  // 確定済みシフト（割当確定ボタンで追加）
+  // 確定済みシフト（再確定→再公開で反映）
   confirmedShifts: [],
+  // 仮割当シフト（公開済みフェーズで「割当確定」を押した分・再確定するまで保留）
+  pendingShifts: [],
   // 店舗ごとのシフトフェーズ（creating → confirmed → published）
   shiftPhase: {
     '渋谷店': 'creating',
@@ -261,6 +263,23 @@ function doLogin({ staffId, password }) {
 
 function doShiftConfirm() {
   const store = appState.currentStaff?.store;
+  if (!DEMO.pendingShifts) DEMO.pendingShifts = [];
+
+  // 仮割当分を confirmedShifts にマージ
+  const storePending = DEMO.pendingShifts.filter(p => {
+    const s = DEMO.staff.find(s => s.id === p.staffId);
+    return s?.store === store;
+  });
+  storePending.forEach(p => {
+    const already = DEMO.confirmedShifts.find(c => c.date === p.date && c.staffId === p.staffId);
+    if (!already) DEMO.confirmedShifts.push(p);
+  });
+  // マージした仮割当を pendingShifts から除去
+  DEMO.pendingShifts = DEMO.pendingShifts.filter(p => {
+    const s = DEMO.staff.find(s => s.id === p.staffId);
+    return s?.store !== store;
+  });
+
   const count = (DEMO.confirmedShifts || []).filter(c => {
     const s = DEMO.staff.find(s => s.id === c.staffId);
     return s?.store === store;
@@ -705,94 +724,78 @@ function buildView(state) {
 
   // ─── シフト作成中 ───────────────────────────
   if (state === STATES.SHIFT_CREATING) {
-    const myStore = st?.store;
+    const myStore   = st?.store;
+    const DOW       = ['日','月','火','水','木','金','土'];
+    const phase     = DEMO.shiftPhase?.[myStore] || 'creating';
 
-    // この店舗のアルバイトIDセット
     const myPartIds = new Set(
       DEMO.staff.filter(s => s.role === ROLES.PART_TIME && s.store === myStore).map(s => s.id)
     );
+    const totalPart      = myPartIds.size;
+    const storeReqs      = DEMO.shiftRequests.filter(r => myPartIds.has(r.staffId));
+    const submittedCount = new Set(storeReqs.map(r => r.staffId)).size;
 
-    // この店舗のアルバイトの勤務希望を取得
-    const storeReqs = DEMO.shiftRequests.filter(r => myPartIds.has(r.staffId));
+    // セクション①：公開済み（confirmedShifts）
+    const publishedList = (DEMO.confirmedShifts || [])
+      .filter(c => myPartIds.has(c.staffId))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
 
-    // 提出済みスタッフ数（重複なし）
-    const submittedStaffIds = [...new Set(storeReqs.map(r => r.staffId))];
-    const submittedCount = submittedStaffIds.length;
-    const totalPart = myPartIds.size;
+    // セクション②：仮割当（pendingShifts）
+    const pendingList = (DEMO.pendingShifts || [])
+      .filter(p => myPartIds.has(p.staffId))
+      .sort((a, b) => a.date.localeCompare(b.date));
 
-    // 日付別に集計（ソート）
-    const byDate = {};
-    storeReqs.forEach(r => {
-      if (!byDate[r.date]) byDate[r.date] = [];
-      byDate[r.date].push(r);
-    });
-    const sortedDates = Object.keys(byDate).sort();
+    // セクション③：希望済み・未割当
+    const takenKeys = new Set([
+      ...(DEMO.confirmedShifts || []).map(c => c.date + '_' + c.staffId),
+      ...(DEMO.pendingShifts   || []).map(p => p.date + '_' + p.staffId),
+    ]);
+    const unassignedList = storeReqs
+      .filter(r => !takenKeys.has(r.date + '_' + r.staffId))
+      .sort((a, b) => a.date.localeCompare(b.date));
 
-    // 確定済みシフト（staffIdごとに1件確定）— confirmedShiftsから取得
-    const confirmed = new Set((DEMO.confirmedShifts || []).map(c => `${c.date}_${c.staffId}`));
-
-    // 各希望をシフト行に変換
-    const shiftRows = sortedDates.flatMap(date => {
-      const reqs = byDate[date];
-      // 日付の曜日
+    const fmtRow = (date, staffName, start, end, badge) => {
       const d = new Date(date);
-      const DOW = ['日','月','火','水','木','金','土'];
       const label = `${date.slice(5).replace('-','/')}(${DOW[d.getDay()]})`;
-      return reqs.map(r => {
-        const staff = DEMO.staff.find(s => s.id === r.staffId);
-        const key = `${date}_${r.staffId}`;
-        const isConfirmed = confirmed.has(key);
-        const badge = isConfirmed
-          ? '<span class="badge-ok">確定済</span>'
-          : '<button class="btn-assign" onclick="confirmShift(\''+date+'\','+r.staffId+')">割当確定</button>';
-        return `<div class="shift-row">
-          <span>${label}</span>
-          <span>${staff?.name || '—'}</span>
-          <span>${r.start}〜${r.end}</span>
-          <span>${badge}</span>
-        </div>`;
-      });
-    });
+      return `<div class="shift-row"><span>${label}</span><span>${staffName}</span><span>${start}〜${end}</span><span>${badge}</span></div>`;
+    };
 
-    const confirmedCount = (DEMO.confirmedShifts || []).filter(c =>
-      myPartIds.has(c.staffId)
-    ).length;
-    const phase = DEMO.shiftPhase?.[myStore] || 'creating';
-    const isConfirmedPhase = phase === 'confirmed' || phase === 'published';
+    const publishedRows  = publishedList.map(c => fmtRow(c.date, DEMO.staff.find(s=>s.id===c.staffId)?.name||'—', c.start, c.end, '<span class="badge-ok">公開済み</span>'));
+    const pendingRows    = pendingList.map(p => fmtRow(p.date, DEMO.staff.find(s=>s.id===p.staffId)?.name||'—', p.start, p.end, '<span class="badge-warn">再確定待ち</span>'));
+    const unassignedRows = unassignedList.map(r => fmtRow(r.date, DEMO.staff.find(s=>s.id===r.staffId)?.name||'—', r.start, r.end,
+      `<button class="btn-assign" onclick="confirmShift('${r.date}',${r.staffId})">割当確定</button>`));
+
+    const section = (title, rows, color) => rows.length === 0 ? '' : `
+      <div class="shift-section-label" style="color:${color};font-size:12px;font-weight:600;letter-spacing:0.04em;margin:12px 0 6px">${title}（${rows.length}件）</div>
+      <div class="shift-table" style="margin-bottom:4px">
+        <div class="shift-row header"><span>日付</span><span>スタッフ</span><span>時間</span><span>状態</span></div>
+        ${rows.join('')}
+      </div>`;
 
     return `
       <div class="view-card">
-        <h2 class="view-title"><i class="ti ti-layout-grid"></i> シフト作成</h2>
+        <h2 class="view-title"><i class="ti ti-layout-grid"></i> シフト割当</h2>
         ${staffChip(st)}
-        ${isConfirmedPhase ? `<div class="badge-success-lg">✓ シフト${phase === 'published' ? '公開済み' : '確定済み'}</div>` : ''}
         <div class="info-grid">
-          <div class="info-card">
-            <div class="info-num">${submittedCount}</div>
-            <div>提出済みスタッフ（全${totalPart}名中）</div>
-          </div>
-          <div class="info-card ${confirmedCount > 0 ? '' : 'warn'}">
-            <div class="info-num">${confirmedCount} <span style="font-size:16px;font-weight:400">/ ${storeReqs.length}</span></div>
-            <div>割当確定件数</div>
-          </div>
+          <div class="info-card"><div class="info-num">${submittedCount}</div><div>希望提出スタッフ（全${totalPart}名中）</div></div>
+          <div class="info-card"><div class="info-num">${publishedList.length}</div><div>公開済みシフト</div></div>
         </div>
-        <div class="shift-table" style="margin-top:12px">
-          <div class="shift-row header"><span>日付</span><span>スタッフ</span><span>時間</span><span>操作</span></div>
-          ${shiftRows.length > 0 ? shiftRows.join('') : '<div class="shift-row"><span style="color:var(--color-text-3)">勤務希望なし</span></div>'}
-        </div>
+        ${section('✓ 公開済み', publishedRows, 'var(--color-ok)')}
+        ${section('⏳ 再確定待ち（仮割当）', pendingRows, 'var(--color-warn)')}
+        ${section('📋 希望済み・未割当', unassignedRows, 'var(--color-text-2)')}
+        ${publishedList.length + pendingList.length + unassignedList.length === 0
+          ? '<div class="warn-box" style="margin-top:12px"><i class="ti ti-info-circle"></i> 勤務希望がまだ提出されていません</div>'
+          : ''}
         <div class="btn-row" style="margin-top:12px">
-          ${phase === 'published' ? '' : `
-            <button class="btn-secondary" id="btn-shift-draft">一時保存</button>
-            <button class="btn-primary"   id="btn-shift-confirm">
-              ${phase === 'confirmed' ? '再確定する' : 'シフトを確定する'}
-            </button>
-          `}
-          ${phase === 'confirmed' ? `
-            <button class="btn-primary" id="btn-shift-publish">スタッフへ公開する</button>
-          ` : ''}
+          <button class="btn-secondary" id="btn-shift-draft">一時保存</button>
+          <button class="btn-primary" id="btn-shift-confirm">${phase === 'confirmed' || phase === 'published' ? '再確定する' : 'シフトを確定する'}</button>
+          ${phase === 'confirmed' ? '<button class="btn-primary" id="btn-shift-publish">スタッフへ公開する</button>' : ''}
         </div>
-        ${phase === 'published'
-          ? '<p class="hint" style="color:var(--color-ok);margin-top:8px">✓ スタッフへ公開済みです。追加割当は「再確定→再公開」が必要です。</p>'
-          : '<p class="hint">割当確定した行だけが公式シフトになります。後から追加も可能です。</p>'
+        ${phase === 'published' && pendingList.length > 0
+          ? '<p class="hint warn-text" style="margin-top:6px">⚠ 仮割当があります。「再確定する」→「スタッフへ公開する」で反映されます。</p>'
+          : phase === 'published'
+            ? '<p class="hint" style="color:var(--color-ok);margin-top:6px">✓ 公開済みです。追加割当→再確定→再公開で追加できます。</p>'
+            : '<p class="hint" style="margin-top:6px">割当確定した行が公式シフトになります。確定後に公開してください。</p>'
         }
       </div>`;
   }
@@ -2173,12 +2176,29 @@ function confirmAttendance(staffId) {
 /* ─── シフト割当確定（シフト作成画面の行ボタン） ─── */
 function confirmShift(date, staffId) {
   if (!DEMO.confirmedShifts) DEMO.confirmedShifts = [];
-  const already = DEMO.confirmedShifts.find(c => c.date === date && c.staffId === staffId);
-  if (!already) {
-    const req = DEMO.shiftRequests.find(r => r.date === date && r.staffId === staffId);
-    if (req) {
+  if (!DEMO.pendingShifts)   DEMO.pendingShifts   = [];
+
+  const store = appState.currentStaff?.store;
+  const phase = DEMO.shiftPhase?.[store] || 'creating';
+  const name  = DEMO.staff.find(s => s.id === staffId)?.name || staffId;
+  const req   = DEMO.shiftRequests.find(r => r.date === date && r.staffId === staffId);
+  if (!req) return;
+
+  if (phase === 'published') {
+    // 公開済みフェーズ → 仮割当（pendingShifts）に追加、本確定はしない
+    const alreadyPending = DEMO.pendingShifts.find(c => c.date === date && c.staffId === staffId);
+    const alreadyConfirmed = DEMO.confirmedShifts.find(c => c.date === date && c.staffId === staffId);
+    if (!alreadyPending && !alreadyConfirmed) {
+      DEMO.pendingShifts.push({ date, staffId, start: req.start, end: req.end });
+      logT('SHIFT_PENDING', `${date} ${name} を仮割当（要再確定・再公開）`);
+      showToast(`${name} を仮割当しました。「再確定する」を押して公開してください。`);
+    }
+  } else {
+    // 作成中・確定済みフェーズ → confirmedShifts に直接追加
+    const already = DEMO.confirmedShifts.find(c => c.date === date && c.staffId === staffId);
+    if (!already) {
       DEMO.confirmedShifts.push({ date, staffId, start: req.start, end: req.end });
-      logT('SHIFT_ASSIGN', `${date} ${DEMO.staff.find(s=>s.id===staffId)?.name || staffId} を割当`);
+      logT('SHIFT_ASSIGN', `${date} ${name} を割当確定`);
     }
   }
   renderMainView();
