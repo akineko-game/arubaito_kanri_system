@@ -69,6 +69,11 @@
       background: var(--bg); position: sticky; top: 0; z-index: 1;
     }
     .scenario-group-header.g-unit    { color: #185fa5; background: #eef5fc; }
+    .scenario-group-header.g-normal  { color: #2d7a4f; background: #eaf3de; }
+    .scenario-group-header.g-abnormal{ color: #b07010; background: #faeeda; }
+    .scenario-group-header.g-conflict{ color: #7c3f9e; background: #f3eefe; }
+    .scenario-group-header.g-longterm{ color: #0f766e; background: #e6fffb; }
+    .scenario-group-header.g-break   { color: #a32d2d; background: #fcebeb; }
     .scenario-group-header.g-30days  { color: #2d7a4f; background: #eaf3de; }
     .scenario-group-header.g-3months { color: #7c3f9e; background: #f3eefe; }
     .scenario-group-header.g-custom  { color: #534ab7; background: #eeedfe; }
@@ -88,6 +93,11 @@
       vertical-align: middle;
     }
     .s-tag.unit    { background: #e6f1fb; color: #185fa5; }
+    .s-tag.normal  { background: #eaf3de; color: #2d7a4f; }
+    .s-tag.abnormal{ background: #faeeda; color: #b07010; }
+    .s-tag.conflict{ background: #f3eefe; color: #7c3f9e; }
+    .s-tag.longterm{ background: #e6fffb; color: #0f766e; }
+    .s-tag.break   { background: #fcebeb; color: #a32d2d; }
     .s-tag.days30  { background: #eaf3de; color: #2d7a4f; }
     .s-tag.months3 { background: #f3eefe; color: #7c3f9e; }
 
@@ -476,6 +486,234 @@ const SCENARIO_GROUPS = [
   },
 
   /* --------------------------------------
+     正常系テスト
+  -------------------------------------- */
+  {
+    id: 'normal', label: '正常系テスト', cls: 'g-normal',
+    scenarios: [
+
+      { title: '正常系：店舗・週・日状態の基本フロー', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: '初期状態確認', action: () => {
+            assert(A().getStoreState('渋谷店')==='open','店舗状態=open');
+            assert(A().getWeeklyShiftState('渋谷店','current')==='creating','週状態=creating');
+        }},
+        { label: '田中花子：勤務希望提出', action: () => {
+            A().loginAsStaff(7);
+            A().setFormValue('inp-shift-date',addDays(today(),2));
+            A().setFormValue('inp-shift-start','10:00');
+            A().setFormValue('inp-shift-end','18:00');
+            F().addShiftRequest();
+            A().transition('SHIFT_REQUEST_SUBMIT');
+            A().logout();
+        }},
+        { label: '日状態=requested確認', action: () => {
+            assert(A().getDailyShiftState('渋谷店',addDays(today(),2))==='requested','日状態=requested');
+        }},
+        { label: '店長：割当確定', action: () => { A().loginAsStaff(3); A().confirmShift(addDays(today(),2),7); } },
+        { label: 'シフト確定', action: () => A().transition('SHIFT_CONFIRM') },
+        { label: '週・日状態 confirmed 確認', action: () => {
+            assert(A().getWeeklyShiftState('渋谷店','current')==='confirmed','週状態=confirmed');
+            assert(A().getDailyShiftState('渋谷店',addDays(today(),2))==='confirmed','日状態=confirmed');
+        }},
+        { label: 'シフト公開', action: () => A().transition('SHIFT_PUBLISH') },
+        { label: '週・日状態 published 確認', action: () => {
+            assert(A().getWeeklyShiftState('渋谷店','current')==='published','週状態=published');
+            assert(A().getDailyShiftState('渋谷店',addDays(today(),2))==='published','日状態=published');
+            assert(A().getStaff(7).state==='シフト公開済','スタッフ状態=シフト公開済');
+        }},
+        { label: '整合性OK', action: () => assertIntegrityOk('正常系基本フロー') },
+      ]},
+
+      { title: '正常系：複数店舗の状態分離', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: '渋谷店だけ公開', action: () => {
+            A().loginAsStaff(7); A().setFormValue('inp-shift-date',addDays(today(),3)); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
+            A().loginAsStaff(3); A().confirmShift(addDays(today(),3),7); A().transition('SHIFT_CONFIRM'); A().transition('SHIFT_PUBLISH'); A().logout();
+        }},
+        { label: '新宿店は未公開のまま', action: () => {
+            assert(A().getWeeklyShiftState('渋谷店','current')==='published','渋谷店=published');
+            assert(A().getWeeklyShiftState('新宿店','current')==='creating','新宿店=creating');
+            assert(A().getWeeklyShiftState('池袋店','current')==='creating','池袋店=creating');
+        }},
+        { label: '新宿店で希望提出', action: () => {
+            A().loginAsStaff(8); A().setFormValue('inp-shift-date',addDays(today(),4)); A().setFormValue('inp-shift-start','09:00'); A().setFormValue('inp-shift-end','17:00'); F().addShiftRequest(); A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
+        }},
+        { label: '新宿店の日状態のみrequested', action: () => {
+            assert(A().getDailyShiftState('新宿店',addDays(today(),4))==='requested','新宿店日状態=requested');
+            assert(A().getWeeklyShiftState('渋谷店','current')==='published','渋谷店は公開維持');
+        }},
+        { label: '整合性OK', action: () => assertIntegrityOk('複数店舗分離') },
+      ]},
+    ]
+  },
+
+  /* --------------------------------------
+     異常系テスト
+  -------------------------------------- */
+  {
+    id: 'abnormal', label: '異常系テスト', cls: 'g-abnormal',
+    scenarios: [
+
+      { title: '異常系：権限外イベントを拒否', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: 'アルバイトでログイン', action: () => A().loginAsStaff(7) },
+        { label: 'SHIFT_CONFIRM拒否', action: () => { const r=A().transition('SHIFT_CONFIRM'); assert(r===false,'アルバイトはシフト確定不可'); } },
+        { label: 'SALARY_CALC拒否', action: () => { const r=A().transition('SALARY_CALC'); assert(r===false,'アルバイトは給与計算不可'); } },
+        { label: '未公開状態を維持', action: () => assert(A().getWeeklyShiftState('渋谷店','current')==='creating','週状態はcreatingのまま') },
+        { label: '整合性OK', action: () => assertIntegrityOk('権限外イベント拒否') },
+      ]},
+
+      { title: '異常系：割当0件では確定不可', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: '店長ログイン', action: () => A().loginAsStaff(3) },
+        { label: '割当なしで確定を試行', action: () => { const r=A().transition('SHIFT_CONFIRM'); assert(r===false,'割当0件では確定不可'); } },
+        { label: '状態維持確認', action: () => assert(A().getWeeklyShiftState('渋谷店','current')==='creating','creatingのまま') },
+        { label: '整合性OK', action: () => assertIntegrityOk('割当0件拒否') },
+      ]},
+
+      { title: '異常系：重複希望・不正時間を登録しない', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: '田中花子ログイン', action: () => A().loginAsStaff(7) },
+        { label: '正常な希望を追加', action: () => { A().setFormValue('inp-shift-date',addDays(today(),5)); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); } },
+        { label: '同日重複を試行', action: () => { A().setFormValue('inp-shift-date',addDays(today(),5)); A().setFormValue('inp-shift-start','11:00'); A().setFormValue('inp-shift-end','19:00'); F().addShiftRequest(); } },
+        { label: '逆転時間を試行', action: () => { A().setFormValue('inp-shift-date',addDays(today(),6)); A().setFormValue('inp-shift-start','18:00'); A().setFormValue('inp-shift-end','10:00'); F().addShiftRequest(); } },
+        { label: '登録件数は1件のみ', action: () => assert(A().getShiftRequests().filter(r=>r.staffId===7).length===1,'不正登録は増えない') },
+        { label: '整合性OK', action: () => assertIntegrityOk('重複・不正時間拒否') },
+      ]},
+    ]
+  },
+
+  /* --------------------------------------
+     競合系テスト
+  -------------------------------------- */
+  {
+    id: 'conflict', label: '競合系テスト', cls: 'g-conflict',
+    scenarios: [
+
+      { title: '競合系：同一スタッフ同日二重割当の重複抑止', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: '希望を1件作成', action: () => { A().loginAsStaff(7); A().setFormValue('inp-shift-date',addDays(today(),7)); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); A().transition('SHIFT_REQUEST_SUBMIT'); A().logout(); } },
+        { label: '店長Aが割当', action: () => { A().loginAsStaff(3); A().confirmShift(addDays(today(),7),7); } },
+        { label: '店長B相当が同じ割当を再実行', action: () => { A().confirmShift(addDays(today(),7),7); } },
+        { label: '確定処理', action: () => A().transition('SHIFT_CONFIRM') },
+        { label: 'confirmedShiftsは1件', action: () => {
+            const n=A().getConfirmedShifts().filter(c=>c.staffId===7 && c.date===addDays(today(),7)).length;
+            assert(n===1,'同一staff/dateの確定は1件');
+        }},
+        { label: '整合性OK', action: () => assertIntegrityOk('二重割当抑止') },
+      ]},
+
+      { title: '競合系：店舗間操作の分離', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: '新宿店だけ臨時休業', action: () => A().setStoreState('新宿店','temporary_closed') },
+        { label: '渋谷店は通常シフト作成', action: () => { A().loginAsStaff(7); A().setFormValue('inp-shift-date',addDays(today(),8)); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); A().transition('SHIFT_REQUEST_SUBMIT'); A().logout(); A().loginAsStaff(3); A().confirmShift(addDays(today(),8),7); A().transition('SHIFT_CONFIRM'); } },
+        { label: '店舗状態分離確認', action: () => {
+            assert(A().getStoreState('新宿店')==='temporary_closed','新宿店=temporary_closed');
+            assert(A().getStoreState('渋谷店')==='open','渋谷店=open');
+            assert(A().getWeeklyShiftState('渋谷店','current')==='confirmed','渋谷店=confirmed');
+            assert(A().getWeeklyShiftState('新宿店','current')==='creating','新宿店=creating');
+        }},
+        { label: '新宿店を復旧', action: () => A().setStoreState('新宿店','open') },
+        { label: '整合性OK', action: () => assertIntegrityOk('店舗間分離') },
+      ]},
+    ]
+  },
+
+  /* --------------------------------------
+     長期系テスト
+  -------------------------------------- */
+  {
+    id: 'longterm', label: '長期系テスト', cls: 'g-longterm',
+    scenarios: [
+
+      { title: '長期系：90日分の希望・割当・日状態更新', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: '10名×9週の希望を作成', detail: '渋谷店中心・90件程度', action: () => {
+            const ids=[7,10,12,15,16,19,21,22,25,28];
+            ids.forEach((sid,idx)=>{
+              A().loginAsStaff(sid);
+              for(let w=0; w<9; w++){
+                const d=addDays(today(), w*7 + (idx%5));
+                A().setFormValue('inp-shift-date',d);
+                A().setFormValue('inp-shift-start','10:00');
+                A().setFormValue('inp-shift-end','18:00');
+                F().addShiftRequest();
+              }
+              A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
+            });
+        }},
+        { label: '件数確認', action: () => assert(A().getShiftRequests().length>=80,'長期希望が80件以上') },
+        { label: '一部を割当確定', action: () => {
+            A().loginAsStaff(3);
+            A().getShiftRequests().filter(r=>r.staffId===7 || r.staffId===10 || r.staffId===12).forEach(r=>A().confirmShift(r.date,r.staffId));
+            A().transition('SHIFT_CONFIRM');
+        }},
+        { label: '日状態が生成されている', action: () => {
+            const snap=A().getStoreOperationalSnapshot('渋谷店');
+            assert(Object.keys(snap.dailyShiftState || {}).length>=20,'日状態が20日以上生成');
+        }},
+        { label: '公開して整合性確認', action: () => { A().transition('SHIFT_PUBLISH'); assertIntegrityOk('90日長期運用'); } },
+      ]},
+
+      { title: '長期系：大量スタッフの勤怠確定', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: '30名分の打刻を生成', action: () => {
+            A().getAllStaff().filter(s=>s.role==='part_time').slice(0,30).forEach((s,idx)=>{
+              A().setStaffClock(s.id, idx%2===0?'10:00':'11:00', idx%2===0?'18:00':'19:00', 60);
+              A().setStaffState(s.id,'勤怠未確定');
+            });
+        }},
+        { label: '店長・管理者で勤怠確定', action: () => { A().loginAsStaff(1); A().getAllStaff().filter(s=>s.role==='part_time' && s.clockOut).slice(0,30).forEach(s=>F().confirmAttendance(s.id)); } },
+        { label: '給与未計算が30件以上', action: () => assert(A().getAllStaff().filter(s=>s.state==='給与未計算').length>=30,'給与未計算30件以上') },
+        { label: '整合性OK', action: () => assertIntegrityOk('大量勤怠確定') },
+      ]},
+    ]
+  },
+
+  /* --------------------------------------
+     破壊系テスト
+     注意：壊した後に必ず復旧し、最終整合性はOKに戻す。
+  -------------------------------------- */
+  {
+    id: 'break', label: '破壊系テスト', cls: 'g-break',
+    scenarios: [
+
+      { title: '破壊系：重複データを検出して復旧', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: '重複shiftRequestsを直接注入', action: () => {
+            const d=addDays(today(),9);
+            F().DEMO.shiftRequests.push({staffId:7,date:d,start:'10:00',end:'18:00'});
+            F().DEMO.shiftRequests.push({staffId:7,date:d,start:'11:00',end:'19:00'});
+        }},
+        { label: '重複検出', action: () => assertIntegrityHas(/重複 staffId=7/,'shiftRequests重複を検出') },
+        { label: '重複を復旧', action: () => {
+            const seen={};
+            F().DEMO.shiftRequests = F().DEMO.shiftRequests.filter(r=>{ const k=r.staffId+'_'+r.date; if(seen[k]) return false; seen[k]=true; return true; });
+        }},
+        { label: '整合性OKへ復帰', action: () => assertIntegrityOk('重複復旧後') },
+      ]},
+
+      { title: '破壊系：給与未計算なのにclockOutなしを検出して復旧', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: '不正スタッフ状態を直接注入', action: () => { const s=rawStaff(11); s.state='給与未計算'; s.clockIn='10:00'; s.clockOut=null; } },
+        { label: 'clockOut欠落を検出', action: () => assertIntegrityHas(/吉田 あおい: 給与未計算なのにclockOutがない/,'給与未計算clockOut欠落') },
+        { label: '自動補正を実行', action: () => A().normalizeAllClockConsistency() },
+        { label: '整合性OKへ復帰', action: () => assertIntegrityOk('clockOut欠落復旧後') },
+      ]},
+
+      { title: '破壊系：未成年深夜シフトを検出して復旧', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: '未成年深夜シフトを直接注入', action: () => { F().DEMO.confirmedShifts.push({staffId:9,date:addDays(today(),10),start:'18:00',end:'23:00'}); } },
+        { label: '未成年深夜を検出', action: () => assertIntegrityHas(/小林 さくら: 未成年者が深夜シフト/,'未成年深夜シフト検出') },
+        { label: '不正シフトを削除', action: () => rawRemoveConfirmedShifts(r=>r.staffId===9 && r.end==='23:00') },
+        { label: '整合性OKへ復帰', action: () => assertIntegrityOk('未成年深夜復旧後') },
+      ]},
+    ]
+  },
+
+
+  /* --------------------------------------
      30日間シミュレーション
   -------------------------------------- */
   {
@@ -786,6 +1024,26 @@ function assert(cond, msg) {
     assertErrors++;
     throw new Error('ASSERT FAIL: ' + msg);
   }
+}
+
+function assertIntegrityOk(msg) {
+  const r = A().integrityCheck();
+  assert(r.ok, (msg || '整合性OK') + ' / errors=' + (r.errors || []).join(' | '));
+}
+function assertIntegrityHas(pattern, msg) {
+  const r = A().integrityCheck();
+  const re = pattern instanceof RegExp ? pattern : new RegExp(String(pattern));
+  const hit = (r.errors || []).some(e => re.test(e));
+  assert(hit, (msg || '期待した不整合が検出される') + ' / errors=' + (r.errors || []).join(' | '));
+}
+function rawStaff(staffId) {
+  return F().DEMO.staff.find(s => s.id === Number(staffId));
+}
+function rawRemoveShiftRequests(predicate) {
+  F().DEMO.shiftRequests = F().DEMO.shiftRequests.filter(r => !predicate(r));
+}
+function rawRemoveConfirmedShifts(predicate) {
+  F().DEMO.confirmedShifts = (F().DEMO.confirmedShifts || []).filter(r => !predicate(r));
 }
 
 /* スピード */
