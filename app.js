@@ -848,7 +848,6 @@ const PROGRESS_MODELS = {
     { state: STATES.SHIFT_PUBLISHED,     label: 'シフト公開',   icon: 'ti-eye' },
     { state: STATES.PRE_WORK,            label: '出勤前',       icon: 'ti-clock' },
     { state: STATES.WORKING,             label: '出勤中',       icon: 'ti-briefcase' },
-    { state: STATES.ON_BREAK,            label: '休憩中',       icon: 'ti-coffee' },
     { state: STATES.ATTENDANCE_PENDING,  label: '勤怠確定',     icon: 'ti-clipboard-check' },
   ],
   [ROLES.ADMIN]: [
@@ -856,7 +855,6 @@ const PROGRESS_MODELS = {
     { state: STATES.SHIFT_CREATING,      label: 'シフト管理',   icon: 'ti-layout-grid' },
     { state: STATES.PRE_WORK,            label: '出勤前',       icon: 'ti-clock' },
     { state: STATES.WORKING,             label: '出勤中',       icon: 'ti-briefcase' },
-    { state: STATES.ON_BREAK,            label: '休憩中',       icon: 'ti-coffee' },
     { state: STATES.ATTENDANCE_PENDING,  label: '勤怠確定',     icon: 'ti-clipboard-check' },
     { state: STATES.SALARY_PENDING,      label: '給与計算',     icon: 'ti-coin' },
   ],
@@ -871,7 +869,12 @@ function getProgressModel() {
 
 function getCurrentProgress() {
   const model = getProgressModel();
-  const idx = model.findIndex(s => s.state === appState.currentState);
+  // ON_BREAK はステッパーに含まれない場合、WORKING として表示する
+  const lookupState = appState.currentState === STATES.ON_BREAK &&
+    !model.find(s => s.state === STATES.ON_BREAK)
+    ? STATES.WORKING
+    : appState.currentState;
+  const idx = model.findIndex(s => s.state === lookupState);
   const i = idx < 0 ? 0 : idx;
   return { idx: i, total: model.length, pct: Math.round(i / Math.max(model.length - 1, 1) * 100), model };
 }
