@@ -216,6 +216,26 @@ function getShiftTargetDefaultDateISO(baseDate = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function getTodayISO(baseDate = new Date()) {
+  return `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, '0')}-${String(baseDate.getDate()).padStart(2, '0')}`;
+}
+function findShiftForStaffByDate(staffId, dateISO = getTodayISO()) {
+  if (!staffId || !dateISO) return null;
+  const sources = [
+    ...(DEMO.confirmedShifts || []),
+    ...(DEMO.pendingShifts || []),
+  ];
+  return sources.find(s => Number(s.staffId) === Number(staffId) && s.date === dateISO) || null;
+}
+function formatShiftForDisplay(shift, staff) {
+  if (!shift) return '本日シフトなし';
+  const store = staff?.store || '';
+  const start = shift.start || '--:--';
+  const end = shift.end || '--:--';
+  return `${store} ${start}〜${end}`;
+}
+
+
 function parseHHMM(str) {
   if (!str) return null;
   const [h, m] = str.split(':').map(Number);
@@ -1301,7 +1321,12 @@ function buildView(state) {
       <div class="view-card">
         <h2 class="view-title"><i class="ti ti-clock"></i> 出勤前</h2>
         ${staffChip(st)}
-        <div class="info-row"><span class="info-label">本日シフト</span><span>${st?.store || '渋谷店'} 10:00〜18:00</span></div>
+        ${(() => {
+          const todayShift = findShiftForStaffByDate(st?.id, getTodayISO());
+          const shiftText = formatShiftForDisplay(todayShift, st);
+          const shiftClass = todayShift ? 'badge-ok' : 'badge-warn';
+          return `<div class="info-row"><span class="info-label">本日シフト</span><span class="${shiftClass}">${shiftText}</span></div>`;
+        })()}
         <div class="info-row"><span class="info-label">Wi-Fi</span>
           <span class="${wifiOk ? 'badge-ok' : 'badge-error'}">${wifiOk ? '接続中' : '未接続'}</span>
         </div>
@@ -3335,3 +3360,6 @@ updateGuideOnStateChange = function() {
 
 
 /* BUILD_VERSION: 20260528_shift_default_date_fix */
+
+
+/* BUILD_VERSION: 20260528_today_shift_actual */
