@@ -282,7 +282,12 @@ function ensureClockConsistencyForStaff(staff, nextState = staff?.state) {
 
   // 勤怠未確定・給与未計算は「勤務が終了している」状態なので、
   // テストランナーの直接ジャンプでも clockIn / clockOut を必ず補完する。
-  if (needsClosedAttendance) {
+  // ただし、店長・管理者が「勤怠確認・確定」タブを押した際に
+  // 自分自身の打刻を自動補完してしまうと、以降の打刻操作が壊れるため除外する。
+  const isSelfManagerOrAdmin =
+    appState.currentStaff?.id === staff.id &&
+    (appState.currentRole === ROLES.MANAGER || appState.currentRole === ROLES.ADMIN);
+  if (needsClosedAttendance && !isSelfManagerOrAdmin) {
     if (!staff.clockIn) {
       const endBase = now();
       const startBase = new Date(endBase.getTime() - 8 * 3600000);
@@ -2202,8 +2207,18 @@ function jumpToState(state) {
   }
 
   if (appState.currentStaff) {
-    appState.currentStaff.state = state;
-    ensureClockConsistencyForStaff(appState.currentStaff, state);
+    // 店長・管理者が「勤怠確認・確定」「給与計算」タブへジャンプした場合は
+    // 自分自身の state / 打刻データを書き換えない（表示切替のみ）。
+    const isSelfManagerOrAdmin =
+      appState.currentRole === ROLES.MANAGER || appState.currentRole === ROLES.ADMIN;
+    const isViewOnlyJump =
+      isSelfManagerOrAdmin &&
+      (state === STATES.ATTENDANCE_PENDING || state === STATES.SALARY_PENDING);
+
+    if (!isViewOnlyJump) {
+      appState.currentStaff.state = state;
+      ensureClockConsistencyForStaff(appState.currentStaff, state);
+    }
   }
 
   logT('DEMO_JUMP', `デモジャンプ → ${state}`);
