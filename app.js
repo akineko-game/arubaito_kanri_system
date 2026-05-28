@@ -181,6 +181,41 @@ function hhmm(date) {
   if (!date) return null;
   return `${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
 }
+
+function addMonthsForDisplay(baseDate, offsetMonths) {
+  const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + offsetMonths, 1);
+  return d;
+}
+function formatYearMonthJP(date) {
+  return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+}
+function formatFullDateJP(date) {
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+}
+function getShiftTargetDate(baseDate = new Date()) {
+  // 勤務希望の業務ルール:
+  // 25日までは翌月分、26日以降は翌々月分を提出対象にする。
+  const offset = baseDate.getDate() <= 25 ? 1 : 2;
+  return addMonthsForDisplay(baseDate, offset);
+}
+function getShiftTargetMonthJP(baseDate = new Date()) {
+  return formatYearMonthJP(getShiftTargetDate(baseDate));
+}
+function getShiftRequestDeadlineDate(baseDate = new Date()) {
+  // 締切は「対象月の前月25日」。
+  const target = getShiftTargetDate(baseDate);
+  return new Date(target.getFullYear(), target.getMonth() - 1, 25);
+}
+function getShiftRequestDeadlineJP(baseDate = new Date()) {
+  return formatFullDateJP(getShiftRequestDeadlineDate(baseDate));
+}
+function getShiftTargetDefaultDateISO(baseDate = new Date()) {
+  // 入力欄の初期値は対象月5日。
+  const target = getShiftTargetDate(baseDate);
+  const d = new Date(target.getFullYear(), target.getMonth(), 5);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function parseHHMM(str) {
   if (!str) return null;
   const [h, m] = str.split(':').map(Number);
@@ -606,7 +641,7 @@ function addShiftRequest() {
   /* 「希望日を追加」ボタン用：重複チェックしてリストに追加するだけ（state遷移なし） */
   const staffId = Number(appState.currentStaff?.id);
   if (!staffId) return;
-  const date  = document.getElementById('inp-shift-date')?.value  || '2025-08-05';
+  const date  = document.getElementById('inp-shift-date')?.value  || getShiftTargetDefaultDateISO();
   const start = document.getElementById('inp-shift-start')?.value || '10:00';
   const end   = document.getElementById('inp-shift-end')?.value   || '18:00';
   if (!date || !start || !end) { showError('日付・時間を入力してください'); return; }
@@ -971,8 +1006,8 @@ function buildView(state) {
       <div class="view-card">
         <h2 class="view-title"><i class="ti ti-calendar-event"></i> 勤務希望提出</h2>
         ${staffChip(st)}
-        <div class="info-row"><span class="info-label">対象月</span><span>2025年8月</span></div>
-        <div class="info-row"><span class="info-label">締切</span><span class="warn-text">2025年7月25日</span></div>
+        <div class="info-row"><span class="info-label">対象月</span><span>${getShiftTargetMonthJP()}</span></div>
+        <div class="info-row"><span class="info-label">締切</span><span class="warn-text">${getShiftRequestDeadlineJP()}</span></div>
         ${st?.hourlyRate ? `<div class="info-row"><span class="info-label">時給</span><span>¥${st.hourlyRate}</span></div>` : ''}
         <div class="shift-table" style="margin-top:8px">
           <div class="shift-row header"><span>希望日</span><span>開始</span><span>終了</span><span>状態</span></div>
@@ -1224,7 +1259,7 @@ function buildView(state) {
         <h2 class="view-title"><i class="ti ti-eye"></i> 確定シフト確認</h2>
         ${staffChip(st)}
         <div class="info-row">
-          <span class="info-label">対象月</span><span>2025年8月</span>
+          <span class="info-label">対象月</span><span>${getShiftTargetMonthJP()}</span>
         </div>
         <div class="info-row">
           <span class="info-label">確定件数</span>
@@ -1539,7 +1574,7 @@ function buildView(state) {
       <div class="view-card">
         <h2 class="view-title"><i class="ti ti-coin"></i> 給与計算</h2>
         ${staffChip(st)}
-        <div class="info-row"><span class="info-label">対象月</span><span>2025年8月</span></div>
+        <div class="info-row"><span class="info-label">対象月</span><span>${getShiftTargetMonthJP()}</span></div>
         ${st?.hourlyRate ? `<div class="info-row"><span class="info-label">時給</span><span>¥${st.hourlyRate}</span></div>` : ''}
         ${workMin > 0 ? `<div class="info-row"><span class="info-label">実働</span><span>${fmtMinutes(workMin)}</span></div>` : ''}
         ${salary ? `<div class="info-row"><span class="info-label">概算支給額</span><span class="staff-name-chip">¥${salary.toLocaleString()}</span></div>` : ''}
@@ -3291,3 +3326,9 @@ updateGuideOnStateChange = function() {
     staff: appState.currentStaff?.name,
   });
 };
+
+
+/* BUILD_VERSION: 20260528_dynamic_shift_month */
+
+
+/* BUILD_VERSION: 20260528_shift_deadline_rule_25 */
