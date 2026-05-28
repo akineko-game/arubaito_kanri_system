@@ -1726,11 +1726,9 @@ function showWorkSummary(type) {
             <div>推定実働時間</div>
           </div>
         </div>
-        ${c.salary !== null ? `
-        <div class="info-card" style="margin-top:8px;text-align:center">
-          <div class="info-num">¥${c.salary.toLocaleString()}</div>
-          <div>推定給与（時給¥${me.hourlyRate} × ${fmtMinutes(c.minutes)}）</div>
-        </div>` : ''}
+        ${c.salary !== null
+          ? '<div class="info-card" style="margin-top:8px;text-align:center"><div class="info-num">¥' + c.salary.toLocaleString() + '</div><div>推定給与（時給¥' + me.hourlyRate + ' × ' + fmtMinutes(c.minutes) + '）</div></div>'
+          : ''}
         ${c.shifts === 0 ? '<div class="warn-box" style="margin-top:8px"><i class="ti ti-info-circle"></i> 当月の確定シフトはまだありません</div>' : ''}
         <p class="hint" style="margin-top:8px">※ 休憩60分を差し引いた推定値です。実際の打刻データが確定した後に正式な数値が確定します。</p>
       </div>`;
@@ -1772,11 +1770,9 @@ function showWorkSummary(type) {
             <div>合計実働時間</div>
           </div>
         </div>
-        ${h.totalSalary !== null && h.totalShifts > 0 ? `
-        <div class="info-card" style="margin-top:8px;text-align:center">
-          <div class="info-num">¥${h.totalSalary.toLocaleString()}</div>
-          <div>3ヶ月合計推定給与</div>
-        </div>` : ''}
+        ${h.totalSalary !== null && h.totalShifts > 0
+          ? '<div class="info-card" style="margin-top:8px;text-align:center"><div class="info-num">¥' + h.totalSalary.toLocaleString() + '</div><div>3ヶ月合計推定給与</div></div>'
+          : ''}
         <p class="hint" style="margin-top:8px">※ 休憩60分を差し引いた推定値です。</p>
       </div>`;
   }
@@ -1892,13 +1888,13 @@ function renderSidebar() {
         <button class="nav-tab" id="tab-work-current" onclick="showWorkSummary('current')">
           <i class="ti ti-chart-bar"></i>当月
           ${workSummary.current.shifts > 0
-            ? `<span class="tab-badge">${workSummary.current.shifts}件</span>`
+            ? '<span class="tab-badge">' + workSummary.current.shifts + '件</span>'
             : ''}
         </button>
         <button class="nav-tab" id="tab-work-history" onclick="showWorkSummary('history')">
           <i class="ti ti-history"></i>過去3ヶ月
           ${workSummary.history.totalShifts > 0
-            ? `<span class="tab-badge">${workSummary.history.totalShifts}件</span>`
+            ? '<span class="tab-badge">' + workSummary.history.totalShifts + '件</span>'
             : ''}
         </button>
       </nav>
