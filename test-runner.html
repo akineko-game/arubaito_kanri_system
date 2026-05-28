@@ -205,7 +205,7 @@
   <div class="control-pane">
 
     <div class="control-toolbar">
-      <button class="btn btn-run"   id="btn-run"   onclick="runScenario()"><i class="ti ti-player-play"></i> 実行</button>
+      <button class="btn btn-run"   id="btn-run"   onclick="runScenario()" disabled><i class="ti ti-player-play"></i> 実行</button>
       <button class="btn btn-pause" id="btn-pause"  onclick="pauseScenario()" disabled><i class="ti ti-player-pause"></i> 一時停止</button>
       <button class="btn btn-run"   id="btn-resume" onclick="resumeScenario()" disabled style="display:none"><i class="ti ti-player-play"></i> 再開</button>
       <button class="btn btn-stop"  id="btn-stop"   onclick="stopScenario()" disabled><i class="ti ti-player-stop"></i> 中止</button>
@@ -262,21 +262,38 @@ let timer   = null;
 
 /* ── iframe 接続 ── */
 const frame = document.getElementById('app-frame');
-frame.addEventListener('load', () => {
-  setTimeout(() => {
+/* ── iframe接続：ShiftAPIが使えるまでポーリング ── */
+function connectAPI() {
+  let attempts = 0;
+  const maxAttempts = 30; // 最大6秒待機
+  const poll = setInterval(() => {
+    attempts++;
     try {
-      API = frame.contentWindow.ShiftAPI;
-      API.on((event, data) => {
-        document.getElementById('preview-state').textContent = data.state || '—';
-        const who = document.getElementById('preview-who');
-        who.textContent = data.staff ? `（${data.staff}）` : '';
-      });
-      log('info', 'システム接続完了', 'ShiftAPIを取得しました');
+      const api = frame.contentWindow?.ShiftAPI;
+      if (api && typeof api.reset === 'function') {
+        clearInterval(poll);
+        API = api;
+        API.on((event, data) => {
+          document.getElementById('preview-state').textContent = data.state || '—';
+          const who = document.getElementById('preview-who');
+          who.textContent = data.staff ? `（${data.staff}）` : '';
+        });
+        document.getElementById('preview-state').textContent = '接続済み';
+        document.getElementById('btn-run').disabled = false;
+        log('info', 'システム接続完了', `ShiftAPIを取得しました（${attempts * 200}ms）`);
+      } else if (attempts >= maxAttempts) {
+        clearInterval(poll);
+        log('error', '接続タイムアウト', 'ページを再読み込みしてください');
+      }
     } catch(e) {
-      log('error', '接続失敗', e.message);
+      // クロスオリジンエラーは無視してリトライ
     }
-  }, 800);
-});
+  }, 200);
+}
+
+frame.addEventListener('load', connectAPI);
+/* 初回ロードが既に完了している場合も対応 */
+if (frame.contentDocument?.readyState === 'complete') connectAPI();
 
 /* ── スピード設定 ── */
 const speedRange = document.getElementById('speed-range');
@@ -395,7 +412,10 @@ function resetAll() {
 }
 
 function runScenario() {
-  if (!API) { alert('システムが読み込み中です。しばらくお待ちください。'); return; }
+  if (!API) {
+    log('warn', '接続待ち', 'システムがまだ読み込み中です。緑の「接続済み」表示をお待ちください。');
+    return;
+  }
   steps   = SCENARIOS[currentScenarioIdx].steps;
   stepIdx = 0;
   running = true;
@@ -440,7 +460,8 @@ function setButtons(state) {
     run.disabled = true; pause.disabled = true; stop.disabled = false;
     pause.style.display = 'none'; resume.style.display = '';
   } else {
-    run.disabled = false; pause.disabled = true; stop.disabled = true;
+    run.disabled = (API === null); // API未接続なら無効のまま
+    pause.disabled = true; stop.disabled = true;
     pause.style.display = ''; resume.style.display = 'none';
   }
 }
