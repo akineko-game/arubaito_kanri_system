@@ -24,12 +24,15 @@
       --primary-bg: #e6f1fb;
       --radius:  10px;
     }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
     body {
       font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
       font-size: 14px;
       background: var(--bg);
       color: var(--text-1);
-      height: 100vh;
       display: flex;
       flex-direction: column;
     }
@@ -39,7 +42,8 @@
       background: var(--surface);
       border-bottom: 0.5px solid var(--border);
       padding: 0 16px;
-      height: 52px;
+      height: 48px;
+      min-height: 48px;
       display: flex;
       align-items: center;
       gap: 12px;
@@ -53,8 +57,9 @@
     /* ── メインレイアウト ── */
     .main {
       display: grid;
-      grid-template-columns: 340px 1fr;
+      grid-template-columns: 320px 1fr;
       flex: 1;
+      min-height: 0;   /* flexの子がoverflowを正しく計算するために必要 */
       overflow: hidden;
     }
 
@@ -64,6 +69,7 @@
       border-right: 0.5px solid var(--border);
       display: flex;
       flex-direction: column;
+      min-height: 0;
       overflow: hidden;
     }
 
@@ -119,7 +125,7 @@
     .scenario-btn.active { background: var(--primary-bg); border-color: var(--primary); color: var(--primary); font-weight: 600; }
 
     /* ── ステップログ ── */
-    .step-log { flex: 1; overflow-y: auto; padding: 8px 0; }
+    .step-log { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 0; }
     .step-item {
       padding: 6px 12px;
       border-bottom: 0.5px solid var(--border);
@@ -145,6 +151,7 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-height: 0;
     }
     .preview-bar {
       background: var(--surface);
@@ -168,6 +175,9 @@
       flex: 1;
       border: none;
       width: 100%;
+      height: 100%;
+      min-height: 0;
+      display: block;
     }
 
     /* ── 進捗バー ── */
@@ -458,7 +468,8 @@ function setButtons(state) {
     pause.style.display = ''; resume.style.display = 'none';
   } else if (state === 'paused') {
     run.disabled = true; pause.disabled = true; stop.disabled = false;
-    pause.style.display = 'none'; resume.style.display = '';
+    pause.style.display = 'none';
+    resume.style.display = ''; resume.disabled = false;
   } else {
     run.disabled = (API === null); // API未接続なら無効のまま
     pause.disabled = true; stop.disabled = true;
