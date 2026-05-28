@@ -1961,6 +1961,9 @@ function renderSidebar() {
         <button class="nav-tab" id="tab-timeline-today" onclick="showTimeline('today')">
           <i class="ti ti-timeline"></i>当日
         </button>
+        <button class="nav-tab" id="tab-timeline-10days" onclick="showTimeline('10days')">
+          <i class="ti ti-calendar-week"></i>前後10日（20日分）
+        </button>
         <button class="nav-tab" id="tab-timeline-range" onclick="showTimeline('range')">
           <i class="ti ti-calendar-search"></i>前後30日
         </button>
@@ -2094,6 +2097,29 @@ function showTimeline(mode) {
 
   // 日付ピッカーの範囲を決定
   const rangeLabel = { today:'当日', range:'前後30日', future:'今後3ヶ月' }[mode];
+
+  // 前後10日：日付選択なし・20日分一括表示
+  if (mode === '10days') {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('next-target'));
+    document.getElementById('tab-timeline-10days')?.classList.add('next-target');
+    mainView.innerHTML = `
+      <div class="view-card">
+        <h2 class="view-title"><i class="ti ti-calendar-week"></i> シフトタイムライン（前後10日・20日分）</h2>
+        <div class="info-row">
+          <span class="info-label">店舗</span>
+          <span class="staff-name-chip">${me.store}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">基準日</span>
+          <span>${demoBaseDate}</span>
+        </div>
+        <div id="timeline-body"></div>
+      </div>`;
+    renderMultiDayTimeline(demoBaseDate, me.store, 10, 10);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
   let minDate, maxDate, defaultDate;
   if (mode === 'today') {
     // 「当日」＝確定シフトのある最初の日（デモ用）
@@ -2256,7 +2282,7 @@ function renderTimelineFor(dateStr, store) {
       </div>
     </div>
     <div class="tl-container">
-      <div class="tl-axis">${hourTicks.join('')}</div>
+      <div class="tl-axis"><div class="tl-axis-track">${hourTicks.join('')}</div></div>
       <div class="tl-body">
         ${nowLine}
         ${bars}
@@ -2265,6 +2291,112 @@ function renderTimelineFor(dateStr, store) {
     <p class="hint" style="margin-top:8px">
       ${isToday ? '■ 濃い色 = 実打刻実績　□ 薄い色 = シフト予定' : isFuture ? '予定シフトの表示です' : '過去のシフト実績'}
     </p>`;
+}
+
+/* ─── 複数日タイムライン（前後N日分を一括表示） ─── */
+function renderMultiDayTimeline(baseDateStr, store, daysBefore, daysAfter) {
+  const el = document.getElementById('timeline-body');
+  if (!el) return;
+
+  const DOW = ['日','月','火','水','木','金','土'];
+  const START_H = 6, END_H = 24, TOTAL_H = END_H - START_H;
+
+  // 表示対象の日付リストを生成
+  const dates = [];
+  const base  = new Date(baseDateStr + 'T00:00:00');
+  for (let i = -daysBefore; i <= daysAfter; i++) {
+    const d = new Date(base);
+    d.setDate(d.getDate() + i);
+    dates.push(d.toISOString().slice(0,10));
+  }
+
+  // この店舗のアルバイトIDセット
+  const storePartIds = new Set(
+    DEMO.staff.filter(s => s.role === ROLES.PART_TIME && s.store === store).map(s => s.id)
+  );
+
+  // 確定シフトを日付→スタッフ別に整理
+  const shiftsByDate = {};
+  (DEMO.confirmedShifts || [])
+    .filter(c => storePartIds.has(c.staffId))
+    .forEach(c => {
+      if (!shiftsByDate[c.date]) shiftsByDate[c.date] = [];
+      const st = DEMO.staff.find(s => s.id === c.staffId);
+      shiftsByDate[c.date].push({ ...c, name: st?.name || '?', state: st?.state, clockIn: st?.clockIn, clockOut: st?.clockOut });
+    });
+
+  // 時間軸ヘッダー（共通）
+  const hourTicks = [];
+  for (let h = START_H; h <= END_H; h += 2) {
+    const pct = (h - START_H) / TOTAL_H * 100;
+    hourTicks.push('<div class="tl-tick" style="left:' + pct + '%">' + h + ':00</div>');
+  }
+  const axisHtml = '<div class="tl-axis"><div class="tl-axis-track">' + hourTicks.join('') + '</div></div>';
+
+  // 日付ブロックを生成
+  const blocks = dates.map(dateStr => {
+    const d       = new Date(dateStr + 'T00:00:00');
+    const dow     = DOW[d.getDay()];
+    const isBase  = dateStr === baseDateStr;
+    const isPast  = dateStr < baseDateStr;
+    const isSun   = d.getDay() === 0;
+    const isSat   = d.getDay() === 6;
+    const dayShifts = (shiftsByDate[dateStr] || []).sort((a,b) => a.start.localeCompare(b.start));
+
+    const dateLabel = dateStr.slice(5).replace('-','/') + '(' + dow + ')';
+    const headerColor = isBase
+      ? 'var(--color-primary)'
+      : isSun ? 'var(--color-error, #a32d2d)'
+      : isSat ? '#5b7ab8'
+      : 'var(--color-text-2)';
+    const bgColor = isBase ? 'var(--color-active-bg, #eef5fc)' : 'transparent';
+
+    // シフトなしの日
+    if (dayShifts.length === 0) {
+      return '<div class="tl-day-block" style="background:' + bgColor + ';border-left:3px solid ' + (isBase ? 'var(--color-primary)' : 'var(--color-border)') + '">'
+        + '<div class="tl-day-header" style="color:' + headerColor + '">'
+        + dateLabel
+        + (isBase ? ' <span style="font-size:10px;background:var(--color-primary);color:#fff;padding:1px 6px;border-radius:8px;margin-left:4px">基準日</span>' : '')
+        + '</div>'
+        + '<div style="padding:4px 10px 8px;font-size:11px;color:var(--color-text-3)">シフトなし</div>'
+        + '</div>';
+    }
+
+    // シフトバー
+    const bars = dayShifts.map(s => {
+      const [sh,sm] = s.start.split(':').map(Number);
+      const [eh,em] = s.end.split(':').map(Number);
+      const startPct = Math.max(0, (sh + sm/60 - START_H) / TOTAL_H * 100);
+      const widthPct = Math.min(100 - startPct, (eh + em/60 - sh - sm/60) / TOTAL_H * 100);
+      let barColor = isPast ? '#aaa' : 'var(--color-primary)';
+      if (s.state === '出勤中' || s.state === '休憩中') barColor = '#2d7a4f';
+      if (s.state === '欠勤申請中' || s.state === '代替募集中') barColor = '#a32d2d';
+      const statusMark = s.state === '出勤中' ? ' 🟢' : s.clockOut ? ' ✓' : s.state === '欠勤申請中' ? ' ✗' : '';
+      return '<div class="tl-row">'
+        + '<div class="tl-name" style="font-size:11px">' + s.name + statusMark + '</div>'
+        + '<div class="tl-track">'
+        + '<div class="tl-shift-bar" style="left:' + startPct + '%;width:' + widthPct + '%;background:' + barColor + '" title="' + s.name + ': ' + s.start + '〜' + s.end + '">'
+        + '<span class="tl-shift-label">' + s.start + '〜' + s.end + '</span>'
+        + '</div>'
+        + '</div>'
+        + '<div class="tl-info">' + dayShifts.length + '名</div>'
+        + '</div>';
+    });
+
+    return '<div class="tl-day-block" style="background:' + bgColor + ';border-left:3px solid ' + (isBase ? 'var(--color-primary)' : 'var(--color-border)') + '">'
+      + '<div class="tl-day-header" style="color:' + headerColor + ';display:flex;align-items:center;gap:6px">'
+      + '<span>' + dateLabel + '</span>'
+      + (isBase ? '<span style="font-size:10px;background:var(--color-primary);color:#fff;padding:1px 6px;border-radius:8px">基準日</span>' : '')
+      + '<span style="font-size:10px;color:var(--color-text-3);margin-left:auto">' + dayShifts.length + '名</span>'
+      + '</div>'
+      + '<div class="tl-container" style="margin:4px 10px 8px">'
+      + axisHtml
+      + '<div class="tl-body">' + bars.join('') + '</div>'
+      + '</div>'
+      + '</div>';
+  });
+
+  el.innerHTML = '<div class="tl-multi-wrap">' + blocks.join('') + '</div>';
 }
 
 /* ─── 欠勤申請パネル（サイドバーボタン用・状態を変えない） ─── */

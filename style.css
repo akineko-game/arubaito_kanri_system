@@ -1210,10 +1210,17 @@ body {
 
 /* 時間軸 */
 .tl-axis {
-  position: relative;
   height: 22px;
   background: var(--color-bg);
   border-bottom: 0.5px solid var(--color-border);
+  /* tl-rowのグリッド（90px + 6px gap + 10px padding）= 106px のオフセット */
+  padding: 0 calc(10px + 48px + 6px) 0 calc(10px + 90px + 6px);
+}
+
+/* 目盛りエリア */
+.tl-axis-track {
+  position: relative;
+  height: 100%;
 }
 
 .tl-tick {
@@ -1318,4 +1325,30 @@ body {
   color: var(--color-text-3);
   text-align: right;
   white-space: nowrap;
+}
+
+/* ---- 複数日タイムライン ---- */
+.tl-multi-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 10px;
+}
+
+.tl-day-block {
+  border-bottom: 0.5px solid var(--color-border);
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.tl-day-block:first-child { border-radius: var(--radius-md) var(--radius-md) 0 0; }
+.tl-day-block:last-child  { border-radius: 0 0 var(--radius-md) var(--radius-md); border-bottom: none; }
+.tl-day-block:first-child:last-child { border-radius: var(--radius-md); }
+
+.tl-day-header {
+  padding: 6px 12px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  border-bottom: 0.5px solid var(--color-border);
+  background: rgba(255,255,255,0.6);
 }
