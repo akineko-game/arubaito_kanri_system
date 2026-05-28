@@ -645,6 +645,7 @@ function doLogin({ staffId, password }) {
     } else {
       // 未打刻 → 必ず出勤前（打刻完了まで他タブロック）
       targetState = STATES.PRE_WORK;
+      appState.clockTabActive = true;  // ログイン直後から打刻専用ステッパーを表示
     }
   } else {
     // アルバイト
@@ -2113,6 +2114,7 @@ function loginAsStaff(staffId) {
     } else {
       // 未打刻 → 必ず出勤前（打刻完了まで他タブロック）
       targetState = STATES.PRE_WORK;
+      appState.clockTabActive = true;  // 打刻専用ステッパーを表示
     }
   } else {
     // アルバイト
@@ -2560,6 +2562,7 @@ function requireClockIn() {
   }
   if (s.clockIn) return true; // 打刻済みなら通過
   // 未打刻 → 打刻画面へ強制リダイレクトしてブロック
+  appState.clockTabActive = true;  // 打刻専用ステッパーを表示
   appState.currentState = STATES.PRE_WORK;
   updateStaff({ state: STATES.PRE_WORK });
   updateGuideOnStateChange();
