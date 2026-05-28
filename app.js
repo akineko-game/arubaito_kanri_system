@@ -1630,7 +1630,7 @@ function loginAsStaff(staffId) {
   appState.currentState = targetState;
   logT('STAFF_LOGIN', `${staff.name}（${ROLE_LABEL[staff.role]}・${staff.store}）でログイン`);
   updateGuideOnStateChange();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (!window.ShiftAPI?.testMode) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 /* ─── 勤務実態集計 ─── */
@@ -2741,7 +2741,7 @@ function doLogout() {
   appState.breakStart    = null;
   logT('LOGOUT', 'ログアウトしました');
   updateGuideOnStateChange();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (!window.ShiftAPI?.testMode) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 /* ═══════════════════════════════════════
@@ -2749,6 +2749,9 @@ function doLogout() {
    window.ShiftAPI 経由で外部JSから操作可能
 ═══════════════════════════════════════ */
 window.ShiftAPI = {
+  /* テストモード（trueのときscrollToをスキップ） */
+  testMode: false,
+
   /* 状態取得 */
   getState:        () => ({ ...appState }),
   getCurrentState: () => appState.currentState,

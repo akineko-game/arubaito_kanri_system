@@ -410,6 +410,68 @@ const SCENARIO_GROUPS = [
         { label: '出勤中確認',            action: () => assert(A().getCurrentState()==='出勤中', '出勤中') },
       ]},
 
+      { title: '管理者：全店舗勤怠確定フロー', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        // 渋谷店：田中花子が出勤〜退勤
+        { label: '田中花子：出勤〜退勤', action: () => {
+            A().setClockIn(7,'10:00'); A().setWorking(7); A().setClockOut(7,'18:05'); A().transition('CLOCK_OUT'); A().logout();
+        }},
+        // 新宿店：中村拓也が出勤〜退勤
+        { label: '中村拓也：出勤〜退勤', action: () => {
+            A().setClockIn(8,'09:55'); A().setWorking(8); A().setClockOut(8,'18:10'); A().transition('CLOCK_OUT'); A().logout();
+        }},
+        // 池袋店：小林さくらが出勤〜退勤
+        { label: '小林さくら：出勤〜退勤', action: () => {
+            A().setClockIn(9,'10:02'); A().setWorking(9); A().setClockOut(9,'16:00'); A().transition('CLOCK_OUT'); A().logout();
+        }},
+        // 管理者が全店舗の勤怠を確定
+        { label: '管理者ログイン',          action: () => A().loginAsStaff(1) },
+        { label: 'ロール確認',              action: () => assert(A().getCurrentRole()==='admin', 'adminロール') },
+        { label: '田中花子：勤怠確定',     action: () => { A().setStaffState(7,'勤怠未確定'); F().confirmAttendance(7); } },
+        { label: '中村拓也：勤怠確定',     action: () => { A().setStaffState(8,'勤怠未確定'); F().confirmAttendance(8); } },
+        { label: '小林さくら：勤怠確定',   action: () => { A().setStaffState(9,'勤怠未確定'); F().confirmAttendance(9); } },
+        { label: '田中花子state確認',      action: () => assert(A().getStaff(7).state==='給与未計算','田中：給与未計算') },
+        { label: '中村拓也state確認',      action: () => assert(A().getStaff(8).state==='給与未計算','中村：給与未計算') },
+        { label: '全店舗給与計算実行',      action: () => { A().jumpToState('給与未計算'); A().transition('SALARY_CALC'); } },
+        { label: '完了', action: () => A().logout() },
+      ]},
+
+      { title: '管理者：複数店舗横断確認', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: '管理者ログイン',           action: () => A().loginAsStaff(1) },
+        { label: 'スタッフ全体確認',         action: () => { const all=A().getAllStaff(); assert(all.length===50,'スタッフ50名'); } },
+        { label: '渋谷店スタッフ数確認',     action: () => { const n=A().getAllStaff().filter(s=>s.store==='渋谷店'&&s.role==='part_time').length; assert(n>0,'渋谷店にアルバイト在籍'); } },
+        { label: '新宿店スタッフ数確認',     action: () => { const n=A().getAllStaff().filter(s=>s.store==='新宿店'&&s.role==='part_time').length; assert(n>0,'新宿店にアルバイト在籍'); } },
+        { label: '池袋店スタッフ数確認',     action: () => { const n=A().getAllStaff().filter(s=>s.store==='池袋店'&&s.role==='part_time').length; assert(n>0,'池袋店にアルバイト在籍'); } },
+        { label: '管理者は全店舗閲覧可能',   action: () => assert(A().getCurrentRole()==='admin','admin権限') },
+        { label: '完了', action: () => A().logout() },
+      ]},
+
+      { title: '管理者：通知再送テスト', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        // 通知失敗状態のスタッフを作る
+        { label: '松田柊：通知失敗状態', action: () => { A().setStaffState(47,'通知送信失敗'); } },
+        { label: '坂本ひな：通知失敗状態', action: () => { A().setStaffState(48,'通知送信失敗'); } },
+        { label: '通知失敗スタッフ数確認', action: () => {
+            const n=A().getAllStaff().filter(s=>s.state==='通知送信失敗').length;
+            assert(n===2,'通知失敗2名');
+        }},
+        { label: '管理者ログイン',          action: () => A().loginAsStaff(1) },
+        { label: '通知センターへ移動',       action: () => A().jumpToState('通知送信失敗') },
+        { label: '通知再送試行',             action: () => { A().transition('NOTIFY_RETRY'); } },
+        { label: '完了', action: () => A().logout() },
+      ]},
+
+      { title: '管理者：給与計算権限テスト', steps: [
+        { label: 'リセット', action: () => A().reset() },
+        { label: '管理者のみSALARY_CALC可能', detail: 'アルバイト・店長はNG', action: () => {} },
+        { label: 'アルバイトはNG',   action: () => { A().loginAsStaff(7); const r=A().transition('SALARY_CALC'); assert(r===false,'アルバイトは給与計算不可'); A().logout(); }},
+        { label: '店長はNG',         action: () => { A().loginAsStaff(3); const r=A().transition('SALARY_CALC'); assert(r===false,'店長は給与計算不可'); A().logout(); }},
+        { label: '管理者はOK',       action: () => { A().loginAsStaff(1); A().jumpToState('給与未計算'); const r=A().transition('SALARY_CALC'); assert(r!==false,'管理者は給与計算可能'); A().logout(); }},
+        { label: '完了', action: () => {} },
+      ]},
+
+
     ]
   },
 
@@ -782,6 +844,8 @@ function runScenario() {
   document.getElementById('log-scenario-title').textContent = title;
 
   running = true; paused = false; stopped = false;
+  // テストモードON（iframe内のscrollToをスキップ）
+  if (frame.contentWindow?.ShiftAPI) frame.contentWindow.ShiftAPI.testMode = true;
   setButtons('running');
   renderStepLog();
   runNext();
@@ -801,6 +865,7 @@ function resumeScenario() {
 function stopScenario() {
   running = false; paused = false; stopped = true;
   clearTimeout(timer); setButtons('idle');
+  if (frame.contentWindow?.ShiftAPI) frame.contentWindow.ShiftAPI.testMode = false;
 }
 
 function setButtons(state) {
@@ -833,6 +898,8 @@ function runNext() {
   if (!running || paused || stopped) return;
   if (stepIdx >= steps.length) {
     running = false; setButtons('idle');
+    // テストモードOFF
+    if (frame.contentWindow?.ShiftAPI) frame.contentWindow.ShiftAPI.testMode = false;
     document.getElementById('progress-bar').style.width = '100%';
     sysLog.endTime = new Date().toISOString();
     sysLog.integrityAfter = API.integrityCheck();
@@ -863,12 +930,27 @@ function runNext() {
     updateStepUI(stepIdx, 'error', e.message);
     log('error', 'エラー: '+step.label, e.message);
   }
-  const after = API.snapshot();
-  sysLog.steps.push({ label: step.label, detail: step.detail||'', before, after, result, error: errorMsg, assertFail });
 
-  if (result === 'error') { stopScenario(); return; }
-  stepIdx++;
-  timer = setTimeout(runNext, getDelay());
+  // iframe内の描画が完了するのを待ってからスナップショットを取得・次ステップへ
+  const finishStep = () => {
+    const after = API.snapshot();
+    sysLog.steps.push({ label: step.label, detail: step.detail||'', before, after, result, error: errorMsg, assertFail });
+    if (result === 'error') { stopScenario(); return; }
+    stepIdx++;
+    // ログイン・ログアウト・状態変化系は描画に時間がかかるため余分に待機
+    const isHeavy = /ログイン|ログアウト|リセット|公開|確定|申請|承認/.test(step.label);
+    const extraDelay = isHeavy ? 300 : 0;
+    timer = setTimeout(runNext, getDelay() + extraDelay);
+  };
+
+  // requestAnimationFrameを2回挟んでiframe描画サイクルを完了させる
+  frame.contentWindow?.requestAnimationFrame
+    ? frame.contentWindow.requestAnimationFrame(() =>
+        frame.contentWindow.requestAnimationFrame(() =>
+          setTimeout(finishStep, 50)
+        )
+      )
+    : setTimeout(finishStep, 100);
 }
 
 /* -- ログUI -- */
