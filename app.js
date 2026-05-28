@@ -208,6 +208,8 @@ function ensureClockConsistencyForStaff(staff, nextState = staff?.state) {
   if (!staff) return false;
 
   const needsClockIn = nextState === STATES.WORKING || nextState === STATES.ON_BREAK;
+  const needsClosedAttendance = nextState === STATES.ATTENDANCE_PENDING || nextState === STATES.SALARY_PENDING;
+
   if (needsClockIn) {
     if (!staff.clockIn) {
       const base = (appState.currentStaff?.id === staff.id && appState.workStart)
@@ -220,6 +222,27 @@ function ensureClockConsistencyForStaff(staff, nextState = staff?.state) {
     if (appState.currentStaff?.id === staff.id) {
       appState.workStart = parseHHMM(staff.clockIn) || appState.workStart || now();
       if (nextState === STATES.ON_BREAK && !appState.breakStart) appState.breakStart = now();
+    }
+  }
+
+  // 勤怠未確定・給与未計算は「勤務が終了している」状態なので、
+  // テストランナーの直接ジャンプでも clockIn / clockOut を必ず補完する。
+  if (needsClosedAttendance) {
+    if (!staff.clockIn) {
+      const endBase = now();
+      const startBase = new Date(endBase.getTime() - 8 * 3600000);
+      staff.clockIn = hhmm(startBase);
+    }
+    if (!staff.clockOut) {
+      const start = parseHHMM(staff.clockIn);
+      const endBase = start ? new Date(start.getTime() + 8 * 3600000) : now();
+      staff.clockOut = hhmm(endBase);
+    }
+    if (staff.breakMin === undefined || staff.breakMin === null) staff.breakMin = 0;
+
+    if (appState.currentStaff?.id === staff.id) {
+      appState.workStart = null;
+      appState.breakStart = null;
     }
   }
 
@@ -463,6 +486,7 @@ function transition(eventName, payload = {}) {
 
   appState.currentState = route.to;
   updateStaff({ state: route.to });
+  if (appState.currentStaff) ensureClockConsistencyForStaff(appState.currentStaff, route.to);
   logT(eventName, `${prev} → ${route.to}`);
   updateGuideOnStateChange();
   return true;
@@ -2948,8 +2972,9 @@ function rejectAbsence(staffId) {
 
 /* ─── 個別勤怠確定（店長・管理者用） ─── */
 function confirmAttendance(staffId) {
-  const s = DEMO.staff.find(s => s.id === staffId);
+  const s = DEMO.staff.find(s => s.id === Number(staffId));
   if (!s) return;
+  ensureClockConsistencyForStaff(s, STATES.ATTENDANCE_PENDING);
   const wm = calcWorkMin(s);
   const est = s.hourlyRate && wm > 0 ? Math.round(s.hourlyRate * wm / 60) : null;
   s.state = STATES.SALARY_PENDING;
@@ -3070,6 +3095,10 @@ window.ShiftAPI = {
   setClockOut: (staffId, time) => {
     const staff = DEMO.staff.find(s => s.id === Number(staffId));
     if (!staff) return false;
+    if (!staff.clockIn) {
+      const end = parseHHMM(time) || now();
+      staff.clockIn = hhmm(new Date(end.getTime() - 8 * 3600000));
+    }
     staff.clockOut = time;
     return true;
   },
@@ -3102,9 +3131,15 @@ window.ShiftAPI = {
     const staff = DEMO.staff.find(s => s.id === Number(staffId));
     if (!staff) return false;
     if (clockIn  !== undefined) staff.clockIn  = clockIn;
-    if (clockOut !== undefined) staff.clockOut = clockOut;
+    if (clockOut !== undefined) {
+      if (!staff.clockIn && clockOut) {
+        const end = parseHHMM(clockOut) || now();
+        staff.clockIn = hhmm(new Date(end.getTime() - 8 * 3600000));
+      }
+      staff.clockOut = clockOut;
+    }
     if (breakMin !== undefined) staff.breakMin = breakMin;
-    if (clockIn && clockOut) staff.state = STATES.ATTENDANCE_PENDING;
+    if (staff.clockIn && staff.clockOut) staff.state = STATES.ATTENDANCE_PENDING;
     return true;
   },
 
