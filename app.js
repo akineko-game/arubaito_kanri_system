@@ -202,6 +202,35 @@ function updateStaff(patch) {
 }
 
 
+// テストランナーやデモジャンプで状態だけを直接変更した場合でも、
+// 「出勤中/休憩中なのに clockIn がない」不整合を起こさないための補正。
+function ensureClockConsistencyForStaff(staff, nextState = staff?.state) {
+  if (!staff) return false;
+
+  const needsClockIn = nextState === STATES.WORKING || nextState === STATES.ON_BREAK;
+  if (needsClockIn) {
+    if (!staff.clockIn) {
+      const base = (appState.currentStaff?.id === staff.id && appState.workStart)
+        ? appState.workStart
+        : now();
+      staff.clockIn = hhmm(base);
+    }
+    staff.clockOut = null;
+
+    if (appState.currentStaff?.id === staff.id) {
+      appState.workStart = parseHHMM(staff.clockIn) || appState.workStart || now();
+      if (nextState === STATES.ON_BREAK && !appState.breakStart) appState.breakStart = now();
+    }
+  }
+
+  return true;
+}
+
+function normalizeAllClockConsistency() {
+  DEMO.staff.forEach(s => ensureClockConsistencyForStaff(s, s.state));
+}
+
+
 /* ═══════════════════════════════════════
    店舗・週・日単位の状態管理
    - storeState: 店舗そのものの営業/運用状態
@@ -1852,6 +1881,7 @@ function loginAsStaff(staffId) {
     else targetState = STATES.SHIFT_CREATING;
   }
 
+  ensureClockConsistencyForStaff(staff, targetState);
   appState.currentState = targetState;
   logT('STAFF_LOGIN', `${staff.name}（${ROLE_LABEL[staff.role]}・${staff.store}）でログイン`);
   updateGuideOnStateChange();
@@ -2008,13 +2038,21 @@ function showWorkSummary(type) {
 /* ─── デモジャンプ（サイドバーボタン用） ─── */
 function jumpToState(state) {
   appState.currentState = state;
+
   if (state !== STATES.LOGGED_OUT && !appState.currentRole) {
     appState.currentRole = ROLES.PART_TIME;
     appState.sessionExpiry = new Date(Date.now() + 8 * 3600000);
   }
+
   if (state === STATES.WORKING && !appState.workStart) {
     appState.workStart = new Date(Date.now() - 3600000);
   }
+
+  if (appState.currentStaff) {
+    appState.currentStaff.state = state;
+    ensureClockConsistencyForStaff(appState.currentStaff, state);
+  }
+
   logT('DEMO_JUMP', `デモジャンプ → ${state}`);
   updateGuideOnStateChange();
 }
@@ -3017,7 +3055,7 @@ window.ShiftAPI = {
     appState.workStart    = new Date();
     appState.currentState = STATES.WORKING;
     staff.state = STATES.WORKING;
-    if (!staff.clockIn) staff.clockIn = new Date().toTimeString().slice(0,5);
+    ensureClockConsistencyForStaff(staff, STATES.WORKING);
     updateGuideOnStateChange();
     return true;
   },
@@ -3040,6 +3078,7 @@ window.ShiftAPI = {
     const staff = DEMO.staff.find(s => s.id === Number(staffId));
     if (!staff) return false;
     staff.state = state;
+    ensureClockConsistencyForStaff(staff, state);
     if (appState.currentStaff?.id === Number(staffId)) {
       appState.currentState = state;
       updateGuideOnStateChange();
@@ -3057,6 +3096,7 @@ window.ShiftAPI = {
   setWeeklyShiftState: (store, weekKey, state) => setWeeklyShiftState(store, weekKey || 'current', state),
   setDailyShiftState: (store, date, state) => setDailyShiftState(store, date, state),
   updateDailyShiftStatesForStore: (store) => { updateDailyShiftStatesForStore(store); return true; },
+  normalizeAllClockConsistency: () => { normalizeAllClockConsistency(); updateGuideOnStateChange(); return true; },
 
   setStaffClock: (staffId, clockIn, clockOut, breakMin) => {
     const staff = DEMO.staff.find(s => s.id === Number(staffId));
@@ -3123,6 +3163,7 @@ window.ShiftAPI = {
 
   /* 整合性チェック（テスト終了時に自動検証） */
   integrityCheck: () => {
+    normalizeAllClockConsistency();
     const errors = [];
     const w = (msg) => errors.push(msg);
 
