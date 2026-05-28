@@ -181,6 +181,16 @@ body {
   color: var(--color-done);
 }
 
+.nav-tab.nav-tab-locked {
+  opacity: 0.38;
+  cursor: not-allowed;
+  pointer-events: auto; /* クリックはJS側でトーストを出す */
+}
+.nav-tab.nav-tab-locked:hover {
+  background: transparent;
+  color: var(--color-text-3);
+}
+
 .nav-tab .tab-badge {
   margin-left: auto;
   font-size: 10px;

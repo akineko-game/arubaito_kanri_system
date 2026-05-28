@@ -637,11 +637,8 @@ function doLogin({ staffId, password }) {
       targetState = STATES.WORKING;
       appState.workStart = parseHHMM(staff.clockIn);
     } else {
-      // 未打刻の場合はシフトフェーズから状態を決定
-      const phase = getShiftPhase(staff.store);
-      if (phase === 'confirmed') targetState = STATES.SHIFT_CONFIRMED;
-      else if (phase === 'published') targetState = STATES.SHIFT_PUBLISHED;
-      else targetState = STATES.SHIFT_CREATING;
+      // 未打刻 → 必ず出勤前（打刻完了まで他タブロック）
+      targetState = STATES.PRE_WORK;
     }
   } else {
     // アルバイト
@@ -1933,6 +1930,7 @@ function renderStaffList() {
 /* ─── 一覧行クリック → そのスタッフとしてログイン ─── */
 /* ─── スタッフ詳細表示（店長用：クリックしてもログインせず詳細だけ表示） ─── */
 function showStaffDetail(staffId) {
+  if (!requireClockIn()) return;
   const s = DEMO.staff.find(st => st.id === staffId);
   if (!s) return;
   const mainView = document.getElementById('main-view');
@@ -2045,10 +2043,8 @@ function loginAsStaff(staffId) {
       targetState = STATES.WORKING;
       appState.workStart = parseHHMM(staff.clockIn);
     } else {
-      const phase = getShiftPhase(staff.store);
-      if (phase === 'confirmed') targetState = STATES.SHIFT_CONFIRMED;
-      else if (phase === 'published') targetState = STATES.SHIFT_PUBLISHED;
-      else targetState = STATES.SHIFT_CREATING;
+      // 未打刻 → 必ず出勤前（打刻完了まで他タブロック）
+      targetState = STATES.PRE_WORK;
     }
   } else {
     // アルバイト
@@ -2125,6 +2121,7 @@ function calcWorkSummary(staff) {
 
 /* ─── 勤務実態パネル表示 ─── */
 function showWorkSummary(type) {
+  if (!requireClockIn()) return;
   const me = appState.currentStaff;
   if (!me) return;
   const mainView = document.getElementById('main-view');
@@ -2213,6 +2210,7 @@ function showWorkSummary(type) {
 
 /* ─── デモジャンプ（サイドバーボタン用） ─── */
 function jumpToState(state) {
+  if (!requireClockIn()) return;
   appState.currentState = state;
 
   if (state !== STATES.LOGGED_OUT && !appState.currentRole) {
@@ -2288,6 +2286,16 @@ function renderSidebar() {
   if (!el) return;
   const role = appState.currentRole;
 
+  // 店長・管理者が未打刻の場合、打刻タブ以外をロック表示にする
+  const clockLocked =
+    (role === ROLES.MANAGER || role === ROLES.ADMIN) &&
+    appState.currentStaff &&
+    !appState.currentStaff.clockIn;
+  // ロックされたタブのクラスを返すヘルパー
+  const lockedCls = (tabId) => clockLocked && tabId !== 'tab-my-clock'
+    ? ' nav-tab-locked'
+    : '';
+
   // ─── 未ログイン ───────────────────────────────
   if (!role) {
     el.innerHTML = `
@@ -2359,60 +2367,60 @@ function renderSidebar() {
         <button class="nav-tab" id="tab-shift-mgmt" onclick="gotoShiftPhase()">
           <i class="ti ti-layout-grid"></i>シフト割当<span class="tab-badge">確定済</span>
         </button>
-        <button class="nav-tab next-target" onclick="appState.currentState=STATES.SHIFT_CONFIRMED; updateGuideOnStateChange()">
+        <button class="nav-tab next-target" onclick="if(requireClockIn()){ appState.currentState=STATES.SHIFT_CONFIRMED; updateGuideOnStateChange(); }">
           <i class="ti ti-send"></i>確定内容確認・公開
         </button>`;
       if (phase === 'published') return `
         <button class="nav-tab" id="tab-shift-mgmt" onclick="gotoShiftPhase()">
           <i class="ti ti-layout-grid"></i>シフト割当<span class="tab-badge">公開済</span>
         </button>
-        <button class="nav-tab done" onclick="appState.currentState=STATES.SHIFT_CONFIRMED; updateGuideOnStateChange()">
+        <button class="nav-tab done" onclick="if(requireClockIn()){ appState.currentState=STATES.SHIFT_CONFIRMED; updateGuideOnStateChange(); }">
           <i class="ti ti-send"></i>確定内容<span class="tab-badge">公開済</span>
         </button>`;
       return '';
     })();
     el.innerHTML = `
       <nav class="nav-section">
+        <div class="nav-section-label">自分の勤務</div>
+        <button class="nav-tab" id="tab-my-clock" onclick="jumpToMyWork()">
+          <i class="ti ti-clock"></i>打刻（自分）
+          ${clockLocked ? '<span class="tab-badge" style="background:var(--color-warn);color:#fff">要打刻</span>' : ''}
+        </button>
+      </nav>
+      <nav class="nav-section">
         <div class="nav-section-label">シフト管理</div>
         ${shiftNavHtml}
       </nav>
       <nav class="nav-section">
-        <div class="nav-section-label">自分の勤務</div>
-        <button class="nav-tab" id="tab-my-clock" onclick="jumpToMyWork()">
-          <i class="ti ti-clock"></i>打刻（自分）
-        </button>
-      </nav>
-      <nav class="nav-section">
         <div class="nav-section-label">勤怠管理</div>
-        <button class="nav-tab" id="tab-attendance" onclick="jumpToState('勤怠未確定')">
+        <button class="nav-tab${lockedCls('tab-attendance')}" id="tab-attendance" onclick="jumpToState('勤怠未確定')">
           <i class="ti ti-clipboard-check"></i>勤怠確認・確定
         </button>
-        <button class="nav-tab" id="tab-ot-approve" onclick="showApprovalPanel('overtime')">
+        <button class="nav-tab${lockedCls('tab-ot-approve')}" id="tab-ot-approve" onclick="showApprovalPanel('overtime')">
           <i class="ti ti-clock-plus"></i>残業承認
         </button>
-        <button class="nav-tab" id="tab-abs-approve" onclick="showApprovalPanel('absence')">
+        <button class="nav-tab${lockedCls('tab-abs-approve')}" id="tab-abs-approve" onclick="showApprovalPanel('absence')">
           <i class="ti ti-calendar-x"></i>欠勤承認
         </button>
       </nav>
-      </nav>
       <nav class="nav-section">
         <div class="nav-section-label">シフトタイムライン</div>
-        <button class="nav-tab" id="tab-timeline-today" onclick="showTimeline('today')">
+        <button class="nav-tab${lockedCls('tab-timeline-today')}" id="tab-timeline-today" onclick="showTimeline('today')">
           <i class="ti ti-timeline"></i>当日
         </button>
-        <button class="nav-tab" id="tab-timeline-10days" onclick="showTimeline('10days')">
+        <button class="nav-tab${lockedCls('tab-timeline-10days')}" id="tab-timeline-10days" onclick="showTimeline('10days')">
           <i class="ti ti-calendar-week"></i>前後10日（20日分）
         </button>
-        <button class="nav-tab" id="tab-timeline-range" onclick="showTimeline('range')">
+        <button class="nav-tab${lockedCls('tab-timeline-range')}" id="tab-timeline-range" onclick="showTimeline('range')">
           <i class="ti ti-calendar-search"></i>前後30日
         </button>
-        <button class="nav-tab" id="tab-timeline-future" onclick="showTimeline('future')">
+        <button class="nav-tab${lockedCls('tab-timeline-future')}" id="tab-timeline-future" onclick="showTimeline('future')">
           <i class="ti ti-calendar-stats"></i>今後3ヶ月
         </button>
       </nav>
       <nav class="nav-section">
         <div class="nav-section-label">その他</div>
-        <button class="nav-tab" id="tab-notify" onclick="jumpToState('通知送信失敗')">
+        <button class="nav-tab${lockedCls('tab-notify')}" id="tab-notify" onclick="jumpToState('通知送信失敗')">
           <i class="ti ti-bell"></i>通知センター
         </button>
         <button class="nav-tab" onclick="doLogout()">
@@ -2429,35 +2437,36 @@ function renderSidebar() {
         <div class="nav-section-label">自分の勤務</div>
         <button class="nav-tab" id="tab-my-clock" onclick="jumpToMyWork()">
           <i class="ti ti-clock"></i>打刻（自分）
+          ${clockLocked ? '<span class="tab-badge" style="background:var(--color-warn);color:#fff">要打刻</span>' : ''}
         </button>
       </nav>
       <nav class="nav-section">
         <div class="nav-section-label">スタッフ管理</div>
-        <button class="nav-tab" onclick="jumpToState('シフト作成中')">
+        <button class="nav-tab${lockedCls('x')}" onclick="jumpToState('シフト作成中')">
           <i class="ti ti-layout-grid"></i>シフト管理
         </button>
       </nav>
       <nav class="nav-section">
         <div class="nav-section-label">給与・経理</div>
-        <button class="nav-tab" id="tab-attendance" onclick="jumpToState('勤怠未確定')">
+        <button class="nav-tab${lockedCls('x')}" id="tab-attendance" onclick="jumpToState('勤怠未確定')">
           <i class="ti ti-clipboard-check"></i>勤怠確定
         </button>
-        <button class="nav-tab" id="tab-salary" onclick="jumpToState('給与未計算')">
+        <button class="nav-tab${lockedCls('x')}" id="tab-salary" onclick="jumpToState('給与未計算')">
           <i class="ti ti-coin"></i>給与計算
         </button>
-        <button class="nav-tab" onclick="showToast('Undefined: CSV項目定義')">
+        <button class="nav-tab${lockedCls('x')}" onclick="showToast('Undefined: CSV項目定義')">
           <i class="ti ti-download"></i>CSV出力
         </button>
       </nav>
       <nav class="nav-section">
         <div class="nav-section-label">システム</div>
-        <button class="nav-tab" id="tab-notify" onclick="jumpToState('通知送信失敗')">
+        <button class="nav-tab${lockedCls('x')}" id="tab-notify" onclick="jumpToState('通知送信失敗')">
           <i class="ti ti-bell"></i>通知センター
         </button>
-        <button class="nav-tab" onclick="showToast('Undefined: 監査ログUI')">
+        <button class="nav-tab${lockedCls('x')}" onclick="showToast('Undefined: 監査ログUI')">
           <i class="ti ti-shield"></i>監査ログ
         </button>
-        <button class="nav-tab" onclick="showToast('Undefined: バックアップ復元方式')">
+        <button class="nav-tab${lockedCls('x')}" onclick="showToast('Undefined: バックアップ復元方式')">
           <i class="ti ti-database"></i>バックアップ
         </button>
         <button class="nav-tab" onclick="doLogout()">
@@ -2466,6 +2475,23 @@ function renderSidebar() {
       </nav>`;
     return;
   }
+}
+
+/* ─── タブ移動ガード（店長・管理者：出勤打刻前は他タブへ移動不可） ─── */
+function requireClockIn() {
+  const role = appState.currentRole;
+  if (role !== ROLES.MANAGER && role !== ROLES.ADMIN) return true; // アルバイトは制限なし
+  const s = appState.currentStaff;
+  if (!s) return true;
+  if (s.clockIn) return true; // 打刻済みなら通過
+  // 未打刻 → 打刻画面へ強制リダイレクトしてブロック
+  appState.currentState = STATES.PRE_WORK;
+  updateStaff({ state: STATES.PRE_WORK });
+  updateGuideOnStateChange();
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('next-target'));
+  document.getElementById('tab-my-clock')?.classList.add('next-target');
+  showToast('⚠ 先に出勤打刻をしてください');
+  return false;
 }
 
 /* ─── 自分の打刻画面へ（店長・管理者用） ─── */
@@ -2497,6 +2523,7 @@ function jumpToMyWork() {
 
 /* ─── シフトフェーズに応じた画面へ（店長用） ─── */
 function gotoShiftPhase(forceCreating) {
+  if (!requireClockIn()) return;
   const store = appState.currentStaff?.store;
   const phase = getShiftPhase(store);
   if (forceCreating || phase === 'creating') {
@@ -2514,6 +2541,7 @@ function gotoShiftPhase(forceCreating) {
 /* ─── 代替応募パネル表示（サイドバーボタン用） ─── */
 /* ─── シフトタイムライン（店長用） ─── */
 function showTimeline(mode) {
+  if (!requireClockIn()) return;
   const me = appState.currentStaff;
   if (!me) return;
   const mainView = document.getElementById('main-view');
@@ -3006,6 +3034,7 @@ function applyReplacement(absentStaffId, date) {
 
 /* ─── 残業承認・欠勤承認パネル（店長用） ─── */
 function showApprovalPanel(type) {
+  if (!requireClockIn()) return;
   const me = appState.currentStaff;
   const mainView = document.getElementById('main-view');
   if (!mainView) return;
