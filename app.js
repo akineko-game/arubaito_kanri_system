@@ -722,6 +722,16 @@ function doShiftSubmit(payload) {
 }
 
 function doClockin() {
+  // ─── シフト有無チェック（最優先ガード） ───────────────────────
+  const todayShift = findShiftForStaffByDate(appState.currentStaff?.id, getTodayISO());
+  if (!todayShift) {
+    showError('本日のシフトがありません。打刻できません。シフトに誤りがある場合は店長へご連絡ください。');
+    return;
+  }
+  // ─── 店舗営業状態チェック ─────────────────────────────────────
+  if (getStoreState(appState.currentStaff?.store) !== STORE_STATES.OPEN) {
+    showError('現在、店舗が営業していません。打刻できません。'); return;
+  }
   if (RULES.WIFI_REQUIRED && !appState.wifiConnected && !RULES.OFFLINE_CLOCK_IN) {
     showError('店舗Wi-Fiに接続されていません。'); return;
   }
@@ -904,6 +914,8 @@ function updateGuideOnStateChange() {
   renderMainView();
   highlightNextTab();
   renderStaffListIfAllowed();
+  // renderMainView()でDOMが再生成されるため、打刻ボタン状態を必ず再評価
+  updateClockButtons();
 }
 
 /* スタッフ一覧は店長・管理者のみ表示 */
@@ -1351,16 +1363,19 @@ function buildView(state) {
   // ─── 出勤前 ─────────────────────────────────
   if (state === STATES.PRE_WORK) {
     const wifiOk = appState.wifiConnected;
+    const todayShift = findShiftForStaffByDate(st?.id, getTodayISO());
+    const shiftText = formatShiftForDisplay(todayShift, st);
+    const shiftClass = todayShift ? 'badge-ok' : 'badge-error';
+    // シフトなし or 店舗クローズの場合は打刻ボタンを無効化
+    const storeOpen = getStoreState(st?.store) === STORE_STATES.OPEN;
+    const clockInEnabled = todayShift !== null && storeOpen;
     return `
       <div class="view-card">
         <h2 class="view-title"><i class="ti ti-clock"></i> 出勤前</h2>
         ${staffChip(st)}
-        ${(() => {
-          const todayShift = findShiftForStaffByDate(st?.id, getTodayISO());
-          const shiftText = formatShiftForDisplay(todayShift, st);
-          const shiftClass = todayShift ? 'badge-ok' : 'badge-warn';
-          return `<div class="info-row"><span class="info-label">本日シフト</span><span class="${shiftClass}">${shiftText}</span></div>`;
-        })()}
+        <div class="info-row"><span class="info-label">本日シフト</span><span class="${shiftClass}">${shiftText}</span></div>
+        ${!todayShift ? `<div class="warn-box" style="margin-bottom:12px"><i class="ti ti-calendar-x"></i> <strong>本日のシフトがありません。</strong>打刻できません。<br>シフトに誤りがある場合は店長へご連絡ください。</div>` : ''}
+        ${!storeOpen && todayShift ? `<div class="warn-box" style="margin-bottom:12px"><i class="ti ti-lock"></i> 現在、店舗が営業していません。打刻できません。</div>` : ''}
         <div class="info-row"><span class="info-label">Wi-Fi</span>
           <span class="${wifiOk ? 'badge-ok' : 'badge-error'}">${wifiOk ? '接続中' : '未接続'}</span>
         </div>
@@ -1369,7 +1384,7 @@ function buildView(state) {
           <span>Wi-Fiシミュレート（デモ用）</span>
         </label>
         ${!wifiOk ? '<div class="warn-box"><i class="ti ti-wifi-off"></i> オフライン打刻は後で同期されます</div>' : ''}
-        <button class="btn-primary btn-xl" id="btn-clock-in">🕐 出勤打刻</button>
+        <button class="btn-primary btn-xl" id="btn-clock-in" ${clockInEnabled ? '' : 'disabled'}>🕐 出勤打刻</button>
       </div>`;
   }
 
