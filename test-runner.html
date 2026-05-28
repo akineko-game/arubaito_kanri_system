@@ -159,6 +159,9 @@
   <span class="header-title">テストランナー</span>
   <span style="font-size:11px;color:var(--text-3)">アルバイト管理統合システム</span>
   <div class="header-spacer"></div>
+  <button class="btn btn-custom" onclick="showLogPanel()" id="btn-log" style="opacity:.5" title="システムログ">
+    <i class="ti ti-file-description"></i> ログ
+  </button>
   <div class="speed-wrap">
     <i class="ti ti-gauge"></i>間隔
     <input type="range" id="speed-range" min="200" max="3000" step="100" value="800" />
@@ -222,6 +225,38 @@
       <span id="preview-step" style="margin-left:auto;color:var(--text-3)"></span>
     </div>
     <iframe id="app-frame" src="index.html"></iframe>
+  </div>
+</div>
+
+<!-- システムログパネル -->
+<div id="log-panel" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:14px;width:90%;max-width:860px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+    <div style="padding:12px 18px;border-bottom:.5px solid #e0ded8;display:flex;align-items:center;gap:10px;flex-shrink:0">
+      <i class="ti ti-file-description" style="font-size:18px;color:#1e5fa8"></i>
+      <span style="font-size:15px;font-weight:700;color:#1a1a18">システムログ</span>
+      <span id="log-scenario-title" style="font-size:12px;color:#909088;margin-left:4px"></span>
+      <div style="flex:1"></div>
+      <button onclick="downloadLog()" style="padding:6px 12px;border-radius:8px;background:#eaf3de;color:#2d7a4f;border:.5px solid #2d7a4f;font-size:12px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-download"></i> JSONダウンロード</button>
+      <button onclick="copyLog()" style="padding:6px 12px;border-radius:8px;background:#e6f1fb;color:#1e5fa8;border:.5px solid #1e5fa8;font-size:12px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px;margin-left:4px"><i class="ti ti-copy"></i> コピー</button>
+      <button onclick="closeLogPanel()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#909088;margin-left:8px;padding:2px"><i class="ti ti-x"></i></button>
+    </div>
+    <div style="display:flex;gap:0;flex:1;min-height:0;overflow:hidden">
+      <!-- 左：ステップログ -->
+      <div style="width:240px;border-right:.5px solid #e0ded8;overflow-y:auto;flex-shrink:0">
+        <div style="padding:7px 12px;font-size:10px;font-weight:700;color:#909088;letter-spacing:.06em;text-transform:uppercase;background:#f5f4f0;border-bottom:.5px solid #e0ded8;position:sticky;top:0">ステップ履歴</div>
+        <div id="log-step-list"></div>
+      </div>
+      <!-- 右：詳細 -->
+      <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+        <div style="padding:7px 12px;font-size:10px;font-weight:700;color:#909088;letter-spacing:.06em;text-transform:uppercase;background:#f5f4f0;border-bottom:.5px solid #e0ded8;display:flex;align-items:center;gap:8px">
+          スナップショット詳細
+          <span id="log-integrity-badge" style="margin-left:auto;font-size:10px;padding:2px 8px;border-radius:8px"></span>
+        </div>
+        <div id="log-detail" style="flex:1;overflow-y:auto;padding:12px 14px;font-size:11px;font-family:Menlo,Monaco,monospace;line-height:1.7;color:#2c2c28;background:#faf8f2;white-space:pre-wrap;word-break:break-all"></div>
+      </div>
+    </div>
+    <!-- フッター：整合性チェック結果 -->
+    <div id="log-integrity" style="padding:10px 18px;border-top:.5px solid #e0ded8;font-size:12px;flex-shrink:0;background:#fff"></div>
   </div>
 </div>
 
@@ -294,7 +329,7 @@ const SCENARIO_GROUPS = [
         { label: '福田ひよりにシフト付与', action: () => { F().DEMO.shiftRequests.push({staffId:33,date:'2025-08-05',start:'10:00',end:'18:00'}); A().confirmShift('2025-08-05',33); } },
         { label: '山田太郎で確定・公開',  action: () => { A().loginAsStaff(3); A().transition('SHIFT_CONFIRM'); A().transition('SHIFT_PUBLISH'); A().logout(); } },
         { label: '福田ひよりログイン',    action: () => A().loginAsStaff(33) },
-        { label: '欠勤申請',              action: () => { F().appState.currentState='欠勤申請中'; F().DEMO.staff.find(s=>s.id===33).state='欠勤申請中'; F().updateGuideOnStateChange(); }, detail: '欠勤申請中へ' },
+        { label: '欠勤申請',              action: () => { A().setStaffState(33,'欠勤申請中'); A().jumpToState('欠勤申請中'); }, detail: '欠勤申請中へ' },
         { label: 'ログアウト',            action: () => A().logout() },
         { label: '山田太郎ログイン',      action: () => A().loginAsStaff(3) },
         { label: '欠勤承認',              action: () => F().approveAbsence(33) },
@@ -304,7 +339,7 @@ const SCENARIO_GROUPS = [
       { title: '残業申請フロー', steps: [
         { label: 'リセット',          action: () => A().reset() },
         { label: '田中花子ログイン',  action: () => { A().loginAsStaff(7); A().jumpToState('出勤中'); } },
-        { label: '残業申請状態へ',    action: () => { F().appState.currentState='残業申請中'; F().DEMO.staff.find(s=>s.id===7).state='残業申請中'; F().updateGuideOnStateChange(); } },
+        { label: '残業申請状態へ',    action: () => { A().setStaffState(7,'残業申請中'); A().jumpToState('残業申請中'); } },
         { label: 'ログアウト',        action: () => A().logout() },
         { label: '山田太郎ログイン',  action: () => A().loginAsStaff(3) },
         { label: '残業承認',          action: () => F().approveOvertime(7) },
@@ -314,8 +349,8 @@ const SCENARIO_GROUPS = [
       { title: '勤怠確定・給与計算フロー', steps: [
         { label: 'リセット',          action: () => A().reset() },
         { label: '管理者ログイン',    action: () => A().loginAsStaff(1) },
-        { label: '金子海斗の打刻セット', action: () => { const s=F().DEMO.staff.find(s=>s.id===38); s.clockIn='10:00'; s.clockOut='18:08'; s.state='勤怠未確定'; } },
-        { label: '内田朱音の打刻セット', action: () => { const s=F().DEMO.staff.find(s=>s.id===43); s.clockIn='10:00'; s.clockOut='18:00'; s.state='勤怠未確定'; } },
+        { label: '金子海斗の打刻セット', action: () => { A().setStaffClock(38,'10:00','18:08',60); } },
+        { label: '内田朱音の打刻セット', action: () => { A().setStaffClock(43,'10:00','18:00',60); } },
         { label: '金子海斗の勤怠確定', action: () => F().confirmAttendance(38) },
         { label: '内田朱音の勤怠確定', action: () => F().confirmAttendance(43) },
         { label: '状態確認',          action: () => { assert(F().DEMO.staff.find(s=>s.id===38).state==='給与未計算','金子：給与未計算'); assert(F().DEMO.staff.find(s=>s.id===43).state==='給与未計算','内田：給与未計算'); } },
@@ -345,9 +380,9 @@ const SCENARIO_GROUPS = [
       { title: 'Wi-Fi接続チェックテスト', steps: [
         { label: 'リセット',              action: () => A().reset() },
         { label: '田中花子ログイン',      action: () => { A().loginAsStaff(7); A().jumpToState('出勤前'); } },
-        { label: 'Wi-Fiオフ',             action: () => { F().appState.wifiConnected=false; F().updateGuideOnStateChange(); } },
-        { label: '警告表示確認',          action: () => assert(F().appState.wifiConnected===false, 'wifiConnected=false') },
-        { label: 'Wi-Fiオン',             action: () => { F().appState.wifiConnected=true; F().updateGuideOnStateChange(); } },
+        { label: 'Wi-Fiオフ',             action: () => { A().setWifi(false); } },
+        { label: '警告表示確認',          action: () => assert(A().getState().wifiConnected===false, 'wifiConnected=false') },
+        { label: 'Wi-Fiオン',             action: () => { A().setWifi(true); } },
         { label: '正常出勤',              action: () => A().transition('CLOCK_IN') },
         { label: '出勤中確認',            action: () => assert(A().getCurrentState()==='出勤中', '出勤中') },
       ]},
@@ -398,34 +433,27 @@ const SCENARIO_GROUPS = [
 
         // ── Week3: 出退勤フェーズ ──
         { label: '【Week3】田中花子：出勤8/1', action: () => {
-            A().loginAsStaff(7);
-            A().setClockIn && A().setClockIn(7,'10:02');
-            F().appState.workStart = new Date(); F().appState.currentState='出勤中';
-            F().DEMO.staff.find(s=>s.id===7).clockIn='10:02'; F().updateGuideOnStateChange();
+            A().setClockIn(7,'10:02');
+            A().setWorking(7);
         }},
         { label: '休憩・復帰', action: () => {
             A().transition('BREAK_START');
             setTimeout(()=>{ try{ A().transition('BREAK_END'); }catch(e){} }, 100);
         }},
-        { label: '退勤打刻', action: () => { F().DEMO.staff.find(s=>s.id===7).clockOut='18:05'; A().transition('CLOCK_OUT'); A().logout(); }},
+        { label: '退勤打刻', action: () => { A().setClockOut(7,'18:05'); A().transition('CLOCK_OUT'); A().logout(); }},
         { label: '加藤健太：出退勤8/2', action: () => {
-            A().loginAsStaff(10);
-            const s=F().DEMO.staff.find(s=>s.id===10); s.clockIn='10:01'; s.breakMin=60;
-            F().appState.workStart=new Date(); F().appState.currentState='出勤中'; F().updateGuideOnStateChange();
-            s.clockOut='18:10'; A().transition('CLOCK_OUT'); A().logout();
+            A().setClockIn(10,'10:01'); A().setWorking(10);
+            A().setClockOut(10,'18:10'); A().transition('CLOCK_OUT'); A().logout();
         }},
         { label: '山本勇気：出退勤8/3', action: () => {
-            A().loginAsStaff(12);
-            const s=F().DEMO.staff.find(s=>s.id===12); s.clockIn='13:02'; s.breakMin=60;
-            F().appState.workStart=new Date(); F().appState.currentState='出勤中'; F().updateGuideOnStateChange();
-            s.clockOut='21:00'; A().transition('CLOCK_OUT'); A().logout();
+            A().setClockIn(12,'13:02'); A().setWorking(12);
+            A().setClockOut(12,'21:00'); A().transition('CLOCK_OUT'); A().logout();
         }},
 
         // ── Week3後半: 欠勤発生 ──
         { label: '木村蓮：欠勤申請8/4', action: () => {
             A().loginAsStaff(15);
-            const s=F().DEMO.staff.find(s=>s.id===15); s.state='欠勤申請中';
-            F().appState.currentState='欠勤申請中'; F().updateGuideOnStateChange();
+            A().setStaffState(15,'欠勤申請中');
             A().logout();
         }},
         { label: '山田太郎：欠勤承認→代替募集', action: () => {
@@ -438,8 +466,8 @@ const SCENARIO_GROUPS = [
         { label: '【Week4】山田太郎：勤怠確定', action: () => {
             A().loginAsStaff(3);
             [7,10,12].forEach(id=>{
-                const s=F().DEMO.staff.find(s=>s.id===id);
-                if(s.clockIn && s.clockOut){ s.state='勤怠未確定'; F().confirmAttendance(id); }
+                const s=A().getStaff(id);
+                if(s?.clockIn && s?.clockOut){ A().setStaffState(id,'勤怠未確定'); F().confirmAttendance(id); }
             });
             A().logout();
         }},
@@ -473,19 +501,19 @@ const SCENARIO_GROUPS = [
         { label: 'シフト確定・公開', action: () => { A().transition('SHIFT_CONFIRM'); A().transition('SHIFT_PUBLISH'); A().logout(); }},
         { label: '中村拓也：出退勤', action: () => {
             A().loginAsStaff(8);
-            const s=F().DEMO.staff.find(s=>s.id===8); s.clockIn='10:01'; s.clockOut='18:05'; s.breakMin=60;
-            F().appState.workStart=new Date(); F().appState.currentState='出勤中'; F().updateGuideOnStateChange();
+            A().setClockIn(8,'10:01'); A().setClockOut(8,'18:05');
+            A().setWorking(A().getCurrentStaff()?.id);
             A().transition('CLOCK_OUT'); A().logout();
         }},
         { label: '吉田あおい：残業発生', action: () => {
             A().loginAsStaff(11);
-            const s=F().DEMO.staff.find(s=>s.id===11); s.clockIn='13:02'; s.breakMin=60; s.overtimeMin=90;
-            F().appState.workStart=new Date(); F().appState.currentState='残業申請中'; F().updateGuideOnStateChange();
+            A().setClockIn(11,'13:02');
+            A().setWorking(A().getCurrentStaff()?.id);
             A().logout();
         }},
         { label: '鈴木恵子：残業承認', action: () => { A().loginAsStaff(4); F().approveOvertime(11); A().logout(); }},
         { label: '勤怠確定・給与計算', action: () => {
-            A().loginAsStaff(4); [8,11].forEach(id=>{ const s=F().DEMO.staff.find(s=>s.id===id); if(s.clockIn){ s.state='勤怠未確定'; F().confirmAttendance(id); } }); A().logout();
+            A().loginAsStaff(4); [8,11].forEach(id=>{ A().setStaffState(id,'勤怠未確定'); F().confirmAttendance(id); }); A().logout();
             A().loginAsStaff(1); A().jumpToState('給与未計算'); A().transition('SALARY_CALC'); A().logout();
         }},
         { label: '新宿店30日間完了', action: () => {} },
@@ -519,7 +547,7 @@ const SCENARIO_GROUPS = [
         }},
         { label: '7月：全員出退勤', action: () => {
             [[7,'2025-07-01','10:02','18:05',60],[10,'2025-07-03','10:01','18:10',60],[7,'2025-07-08','10:00','18:00',60],[10,'2025-07-10','10:03','18:05',60]].forEach(([sid,d,ci,co,bm])=>{
-                const s=F().DEMO.staff.find(s=>s.id===sid); s.clockIn=ci; s.clockOut=co; s.breakMin=bm; s.state='勤怠未確定';
+                A().setStaffClock(sid,ci,co,bm); A().setStaffState(sid,'勤怠未確定');
             });
         }},
         { label: '7月：勤怠確定・給与計算', action: () => {
@@ -541,11 +569,11 @@ const SCENARIO_GROUPS = [
             A().transition('SHIFT_CONFIRM'); A().transition('SHIFT_PUBLISH'); A().logout();
         }},
         { label: '8月中旬：木村蓮が欠勤', action: () => {
-            A().loginAsStaff(15); const s=F().DEMO.staff.find(s=>s.id===15); s.state='欠勤申請中'; F().appState.currentState='欠勤申請中'; F().updateGuideOnStateChange(); A().logout();
+            A().loginAsStaff(15); A().setStaffState(15,'欠勤申請中'); A().jumpToState('欠勤申請中'); A().logout();
             A().loginAsStaff(3); F().approveAbsence(15); A().logout();
         }},
         { label: '8月：出退勤（田中・加藤）', action: () => {
-            [[7,'10:02','18:05',60],[10,'10:01','18:10',60]].forEach(([sid,ci,co,bm])=>{ const s=F().DEMO.staff.find(s=>s.id===sid); s.clockIn=ci; s.clockOut=co; s.breakMin=bm; s.state='勤怠未確定'; });
+            [[7,'10:02','18:05',60],[10,'10:01','18:10',60]].forEach(([sid,ci,co,bm])=>{ A().setStaffClock(sid,ci,co,bm); A().setStaffState(sid,'勤怠未確定'); });
         }},
         { label: '8月：勤怠確定・給与計算', action: () => {
             A().loginAsStaff(3); [7,10,12].forEach(id=>{ const s=F().DEMO.staff.find(s=>s.id===id); if(s.clockIn&&s.clockOut){ F().confirmAttendance(id); } }); A().logout();
@@ -555,7 +583,7 @@ const SCENARIO_GROUPS = [
         // ─ 9月 ─
         { label: '【9月】3名で希望提出（木村は復帰）', action: () => {
             [[7,['2025-09-02','2025-09-09','2025-09-16']],[10,['2025-09-04','2025-09-11','2025-09-18']],[15,['2025-09-03','2025-09-10','2025-09-17']]].forEach(([sid,dates])=>{
-                A().loginAsStaff(sid); F().DEMO.staff.find(s=>s.id===sid).state='未ログイン';
+                A().loginAsStaff(sid); A().setStaffState(sid,'未ログイン');
                 dates.forEach(d=>{ A().setFormValue('inp-shift-date',d); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); });
                 A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
             });
@@ -566,7 +594,7 @@ const SCENARIO_GROUPS = [
             A().transition('SHIFT_CONFIRM'); A().transition('SHIFT_PUBLISH'); A().logout();
         }},
         { label: '9月：出退勤', action: () => {
-            [[7,'10:01','18:00',60],[10,'10:03','18:10',60],[15,'10:00','18:05',60]].forEach(([sid,ci,co,bm])=>{ const s=F().DEMO.staff.find(s=>s.id===sid); s.clockIn=ci; s.clockOut=co; s.breakMin=bm; s.state='勤怠未確定'; });
+            [[7,'10:01','18:00',60],[10,'10:03','18:10',60],[15,'10:00','18:05',60]].forEach(([sid,ci,co,bm])=>{ A().setStaffClock(sid,ci,co,bm); A().setStaffState(sid,'勤怠未確定'); });
         }},
         { label: '9月：勤怠確定・給与計算', action: () => {
             A().loginAsStaff(3); [7,10,15].forEach(id=>{ const s=F().DEMO.staff.find(s=>s.id===id); if(s.clockIn&&s.clockOut){ F().confirmAttendance(id); } }); A().logout();
@@ -585,7 +613,7 @@ const SCENARIO_GROUPS = [
         }},
         { label: '8月：複数欠勤発生', action: () => {
             // 田中・加藤が同時に欠勤申請
-            [7,10].forEach(id=>{ A().loginAsStaff(id); const s=F().DEMO.staff.find(s=>s.id===id); s.state='欠勤申請中'; F().appState.currentState='欠勤申請中'; F().updateGuideOnStateChange(); A().logout(); });
+            [7,10].forEach(id=>{ A().loginAsStaff(id); A().setStaffState(id,'欠勤申請中'); A().jumpToState('欠勤申請中'); A().logout(); });
         }},
         { label: '店長：2件同時承認→代替募集', action: () => {
             A().loginAsStaff(3); [7,10].forEach(id=>F().approveAbsence(id));
@@ -594,11 +622,11 @@ const SCENARIO_GROUPS = [
             A().logout();
         }},
         { label: '8月：残業多発週（2名残業申請）', action: () => {
-            [12,15].forEach(id=>{ const s=F().DEMO.staff.find(s=>s.id===id); s.state='残業申請中'; s.overtimeMin=90; s.clockIn='10:00'; });
+            [12,15].forEach(id=>{ A().setStaffClock(id,'10:00',undefined,0); A().setStaffState(id,'残業申請中'); });
             A().loginAsStaff(3); F().approveOvertime(12); F().approveOvertime(15); A().logout();
         }},
         { label: '9月：通知失敗シミュレーション', action: () => {
-            [47,48].forEach(id=>{ const s=F().DEMO.staff.find(s=>s.id===id); s.state='通知送信失敗'; });
+            [47,48].forEach(id=>{ A().setStaffState(id,'通知送信失敗'); });
             A().loginAsStaff(1); A().jumpToState('通知送信失敗'); A().transition('NOTIFY_RETRY'); A().logout();
         }},
         { label: '9月：新スタッフ初回ログイン', action: () => {
@@ -626,6 +654,17 @@ let paused   = false;
 let stopped  = false;
 let timer    = null;
 let assertErrors = 0;
+
+/* システムログ */
+let sysLog = {
+  scenarioTitle: '',
+  startTime: null,
+  endTime: null,
+  steps: [],         // { label, detail, before, after, result, error, assertFail }
+  integrityBefore: null,
+  integrityAfter: null,
+};
+let selectedLogStep = -1;
 
 const frame = document.getElementById('app-frame');
 
@@ -710,12 +749,17 @@ function selectScenario(groupId, idx) {
 /* ── 実行制御 ── */
 function runScenario() {
   if (!API) return;
-  if (steps.length === 0) {
-    const g = SCENARIO_GROUPS.find(g => g.id === currentGroupId);
-    if (!g) return;
-    steps = g.scenarios[currentScenIdx].steps;
-  }
+  const g = SCENARIO_GROUPS.find(g => g.id === currentGroupId);
+  if (g && steps.length === 0) steps = g.scenarios[currentScenIdx].steps;
   stepIdx = 0; assertErrors = 0;
+
+  // ログ初期化
+  const title = g ? g.scenarios[currentScenIdx].title : 'カスタム';
+  sysLog = { scenarioTitle: title, startTime: new Date().toISOString(), endTime: null, steps: [], integrityBefore: null, integrityAfter: null };
+  sysLog.integrityBefore = API.integrityCheck();
+  document.getElementById('btn-log').style.opacity = '1';
+  document.getElementById('log-scenario-title').textContent = title;
+
   running = true; paused = false; stopped = false;
   setButtons('running');
   renderStepLog();
@@ -769,10 +813,14 @@ function runNext() {
   if (stepIdx >= steps.length) {
     running = false; setButtons('idle');
     document.getElementById('progress-bar').style.width = '100%';
+    sysLog.endTime = new Date().toISOString();
+    sysLog.integrityAfter = API.integrityCheck();
     if (assertErrors > 0) {
       log('error', 'テスト完了（失敗あり）', assertErrors + '件のアサーション失敗');
+    } else if (!sysLog.integrityAfter.ok) {
+      log('warn', '✓ ステップ完了・整合性警告', sysLog.integrityAfter.errors.length + '件の不整合を検出 → ログボタンで確認');
     } else {
-      log('ok', '✓ テスト完了', '全 ' + steps.length + ' ステップ成功');
+      log('ok', '✓ テスト完了・整合性OK', '全 ' + steps.length + ' ステップ成功');
     }
     return;
   }
@@ -782,16 +830,24 @@ function runNext() {
   document.getElementById('progress-bar').style.width = Math.round(stepIdx/steps.length*100)+'%';
   document.getElementById('preview-step').textContent = (stepIdx+1)+'/'+steps.length;
 
+  const before = API.snapshot();
+  let result = 'ok', errorMsg = null, assertFail = false;
   try {
     step.action();
     updateStepUI(stepIdx, 'ok');
-    stepIdx++;
-    timer = setTimeout(runNext, getDelay());
   } catch(e) {
+    result = e.message.startsWith('ASSERT FAIL') ? 'assert' : 'error';
+    errorMsg = e.message;
+    assertFail = result === 'assert';
     updateStepUI(stepIdx, 'error', e.message);
     log('error', 'エラー: '+step.label, e.message);
-    stopScenario();
   }
+  const after = API.snapshot();
+  sysLog.steps.push({ label: step.label, detail: step.detail||'', before, after, result, error: errorMsg, assertFail });
+
+  if (result === 'error') { stopScenario(); return; }
+  stepIdx++;
+  timer = setTimeout(runNext, getDelay());
 }
 
 /* ── ログUI ── */
@@ -894,6 +950,149 @@ function loadAndRun() {
 
 /* 初期化 */
 renderScenarioList();
+
+/* ═══════════════════════════════════
+   システムログパネル
+═══════════════════════════════════ */
+function showLogPanel() {
+  if (!sysLog.steps.length) { log('warn', 'ログなし', 'まずシナリオを実行してください'); return; }
+  renderLogPanel();
+  document.getElementById('log-panel').style.display = 'flex';
+}
+function closeLogPanel() { document.getElementById('log-panel').style.display = 'none'; }
+
+function renderLogPanel() {
+  // ── ステップ一覧 ──
+  const list = document.getElementById('log-step-list');
+  list.innerHTML = sysLog.steps.map((s, i) => {
+    const cls = s.result === 'ok' ? '#2d7a4f' : s.result === 'assert' ? '#b07010' : '#a32d2d';
+    const icon = s.result === 'ok' ? '✓' : s.result === 'assert' ? '⚠' : '✗';
+    const active = i === selectedLogStep;
+    return '<div onclick="selectLogStep(' + i + ')" style="padding:6px 12px;border-bottom:.5px solid #e0ded8;cursor:pointer;background:' + (active ? '#e6f1fb' : 'transparent') + ';display:flex;gap:6px;align-items:start">'
+      + '<span style="color:' + cls + ';font-size:13px;flex-shrink:0">' + icon + '</span>'
+      + '<div><div style="font-size:11px;font-weight:600;color:#1a1a18;line-height:1.3">' + s.label + '</div>'
+      + (s.detail ? '<div style="font-size:10px;color:#909088">' + s.detail + '</div>' : '')
+      + (s.error ? '<div style="font-size:10px;color:#a32d2d">' + s.error.slice(0,60) + '</div>' : '')
+      + '</div></div>';
+  }).join('');
+
+  // ── 整合性チェック結果 ──
+  const ic = sysLog.integrityAfter || sysLog.integrityBefore;
+  const badge = document.getElementById('log-integrity-badge');
+  const footer = document.getElementById('log-integrity');
+  if (ic) {
+    if (ic.ok) {
+      badge.textContent = '✓ 整合性OK'; badge.style.cssText = 'background:#eaf3de;color:#2d7a4f;margin-left:auto;font-size:10px;padding:2px 8px;border-radius:8px';
+      footer.innerHTML = '<span style="color:#2d7a4f;font-weight:600">✓ データ整合性チェック: 問題なし</span>';
+    } else {
+      badge.textContent = '⚠ 不整合 ' + ic.errors.length + '件'; badge.style.cssText = 'background:#faeeda;color:#b07010;margin-left:auto;font-size:10px;padding:2px 8px;border-radius:8px';
+      footer.innerHTML = '<span style="color:#b07010;font-weight:600">⚠ データ整合性チェック: ' + ic.errors.length + '件の不整合</span>'
+        + '<ul style="margin:4px 0 0 16px;color:#a32d2d;font-size:11px">'
+        + ic.errors.map(e => '<li>' + e + '</li>').join('') + '</ul>';
+    }
+  }
+
+  // 最初のステップを選択
+  if (selectedLogStep < 0 && sysLog.steps.length > 0) selectLogStep(0);
+}
+
+function selectLogStep(i) {
+  selectedLogStep = i;
+  const step = sysLog.steps[i];
+  if (!step) return;
+
+  // ステップ一覧の選択状態更新
+  document.querySelectorAll('#log-step-list > div').forEach((el, j) => {
+    el.style.background = j === i ? '#e6f1fb' : 'transparent';
+  });
+
+  // 詳細表示：before/afterのdiff
+  const detail = document.getElementById('log-detail');
+  const before = step.before;
+  const after  = step.after;
+
+  const diffStaff = after.staff.filter(as => {
+    const bs = before.staff.find(s => s.id === as.id);
+    if (!bs) return false;
+    return JSON.stringify(bs) !== JSON.stringify(as);
+  }).map(as => {
+    const bs = before.staff.find(s => s.id === as.id);
+    const changes = [];
+    Object.keys(as).forEach(k => {
+      if (JSON.stringify(bs[k]) !== JSON.stringify(as[k]))
+        changes.push('  ' + k + ': ' + JSON.stringify(bs[k]) + ' → ' + JSON.stringify(as[k]));
+    });
+    return as.name + ' (' + as.store + ')
+' + changes.join('
+');
+  });
+
+  const diffRequests = after.shiftRequests.length !== before.shiftRequests.length
+    ? '  shiftRequests: ' + before.shiftRequests.length + '件 → ' + after.shiftRequests.length + '件' : '';
+  const diffConfirmed = after.confirmedShifts.length !== before.confirmedShifts.length
+    ? '  confirmedShifts: ' + before.confirmedShifts.length + '件 → ' + after.confirmedShifts.length + '件' : '';
+  const diffPhase = Object.entries(after.shiftPhase).filter(([k,v]) => before.shiftPhase[k] !== v)
+    .map(([k,v]) => '  shiftPhase[' + k + ']: ' + before.shiftPhase[k] + ' → ' + v).join('
+');
+  const diffState = before.appState.currentState !== after.appState.currentState
+    ? '  currentState: ' + before.appState.currentState + ' → ' + after.appState.currentState : '';
+  const diffWho = (before.appState.currentStaff?.name||'なし') !== (after.appState.currentStaff?.name||'なし')
+    ? '  currentStaff: ' + (before.appState.currentStaff?.name||'なし') + ' → ' + (after.appState.currentStaff?.name||'なし') : '';
+
+  const hasDiff = diffStaff.length || diffRequests || diffConfirmed || diffPhase || diffState || diffWho;
+
+  detail.textContent =
+    '【ステップ ' + (i+1) + '】 ' + step.label + '
+'
+    + (step.detail ? '詳細: ' + step.detail + '
+' : '')
+    + '結果: ' + (step.result === 'ok' ? '✓ 成功' : step.result === 'assert' ? '⚠ アサーション失敗' : '✗ エラー') + '
+'
+    + (step.error ? 'エラー: ' + step.error + '
+' : '')
+    + '
+── 変化したデータ ──
+'
+    + (hasDiff
+        ? (diffState ? diffState + '
+' : '')
+          + (diffWho ? diffWho + '
+' : '')
+          + (diffRequests ? diffRequests + '
+' : '')
+          + (diffConfirmed ? diffConfirmed + '
+' : '')
+          + (diffPhase ? diffPhase + '
+' : '')
+          + (diffStaff.length ? '
+スタッフ変化:
+' + diffStaff.join('
+
+') : '')
+        : '（変化なし）')
+    + '
+
+── 操作後のスナップショット ──
+'
+    + JSON.stringify({ appState: after.appState, shiftPhase: after.shiftPhase, confirmedShifts: after.confirmedShifts, pendingShifts: after.pendingShifts }, null, 2);
+}
+
+function downloadLog() {
+  const data = JSON.stringify(sysLog, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'shift-test-log-' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function copyLog() {
+  navigator.clipboard.writeText(JSON.stringify(sysLog, null, 2))
+    .then(() => log('ok', 'コピー完了', 'ログをクリップボードにコピーしました'))
+    .catch(() => log('error', 'コピー失敗', 'クリップボードAPIが使えません'));
+}
 </script>
 </body>
 </html>

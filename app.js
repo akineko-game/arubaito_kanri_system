@@ -2626,6 +2626,62 @@ window.ShiftAPI = {
   approveAbsence:  (staffId) => approveAbsence(staffId),
   rejectAbsence:   (staffId) => rejectAbsence(staffId),
 
+  /* テスト用：出勤状態を直接セット */
+  setWorking: (staffId) => {
+    const id = Number(staffId) || (appState.currentStaff?.id);
+    if (!id) return false;
+    const staff = DEMO.staff.find(s => s.id === id);
+    if (!staff) return false;
+    if (appState.currentStaff?.id !== id) loginAsStaff(id);
+    appState.workStart    = new Date();
+    appState.currentState = STATES.WORKING;
+    staff.state = STATES.WORKING;
+    if (!staff.clockIn) staff.clockIn = new Date().toTimeString().slice(0,5);
+    updateGuideOnStateChange();
+    return true;
+  },
+
+  setClockIn: (staffId, time) => {
+    const staff = DEMO.staff.find(s => s.id === Number(staffId));
+    if (!staff) return false;
+    staff.clockIn = time;
+    return true;
+  },
+
+  setClockOut: (staffId, time) => {
+    const staff = DEMO.staff.find(s => s.id === Number(staffId));
+    if (!staff) return false;
+    staff.clockOut = time;
+    return true;
+  },
+
+  setStaffState: (staffId, state) => {
+    const staff = DEMO.staff.find(s => s.id === Number(staffId));
+    if (!staff) return false;
+    staff.state = state;
+    if (appState.currentStaff?.id === Number(staffId)) {
+      appState.currentState = state;
+      updateGuideOnStateChange();
+    }
+    return true;
+  },
+
+  setWifi: (connected) => {
+    appState.wifiConnected = !!connected;
+    updateGuideOnStateChange();
+    return true;
+  },
+
+  setStaffClock: (staffId, clockIn, clockOut, breakMin) => {
+    const staff = DEMO.staff.find(s => s.id === Number(staffId));
+    if (!staff) return false;
+    if (clockIn  !== undefined) staff.clockIn  = clockIn;
+    if (clockOut !== undefined) staff.clockOut = clockOut;
+    if (breakMin !== undefined) staff.breakMin = breakMin;
+    if (clockIn && clockOut) staff.state = STATES.ATTENDANCE_PENDING;
+    return true;
+  },
+
   /* フォーム値注入（テスト時に入力欄に値をセット） */
   setFormValue: (id, value) => {
     const el = document.getElementById(id);
