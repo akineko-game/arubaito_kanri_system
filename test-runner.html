@@ -262,15 +262,15 @@
 </div>
 
 <script>
-/* ═══════════════════════════════════
+/* ===================================
    シナリオ定義
    グループ: unit / days30 / months3 / custom
-═══════════════════════════════════ */
+=================================== */
 const SCENARIO_GROUPS = [
 
-  /* ──────────────────────────────────────
+  /* --------------------------------------
      機能テスト（ユニット）
-  ────────────────────────────────────── */
+  -------------------------------------- */
   {
     id: 'unit', label: '機能テスト', cls: 'g-unit',
     scenarios: [
@@ -391,9 +391,9 @@ const SCENARIO_GROUPS = [
     ]
   },
 
-  /* ──────────────────────────────────────
+  /* --------------------------------------
      30日間シミュレーション
-  ────────────────────────────────────── */
+  -------------------------------------- */
   {
     id: 'days30', label: '30日間シミュレーション', cls: 'g-30days',
     scenarios: [
@@ -401,7 +401,7 @@ const SCENARIO_GROUPS = [
       { title: '8月：渋谷店の30日間', steps: [
         { label: 'リセット',               detail: '全データ初期化', action: () => A().reset() },
 
-        // ── Week1: 勤務希望提出フェーズ ──
+        // -- Week1: 勤務希望提出フェーズ --
         { label: '【Week1】田中花子：希望提出', detail: '8/1,3,5,7', action: () => {
             A().loginAsStaff(7);
             [['2025-08-01','10:00','18:00'],['2025-08-03','13:00','21:00'],['2025-08-05','10:00','18:00'],['2025-08-07','10:00','18:00']].forEach(([d,s,e])=>{A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
@@ -423,7 +423,7 @@ const SCENARIO_GROUPS = [
             A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
         }},
 
-        // ── Week2: 店長シフト作成・公開 ──
+        // -- Week2: 店長シフト作成・公開 --
         { label: '【Week2】山田太郎：シフト割当', detail: '全員分を割当確定', action: () => {
             A().loginAsStaff(3);
             [[7,'2025-08-01'],[12,'2025-08-01'],[10,'2025-08-02'],[12,'2025-08-02'],[7,'2025-08-03'],[12,'2025-08-03'],[10,'2025-08-04'],[15,'2025-08-04'],[7,'2025-08-05'],[15,'2025-08-05'],[10,'2025-08-06'],[15,'2025-08-06'],[7,'2025-08-07'],[15,'2025-08-07'],[10,'2025-08-08'],[12,'2025-08-08']].forEach(([sid,d])=>A().confirmShift(d,sid));
@@ -432,7 +432,7 @@ const SCENARIO_GROUPS = [
         { label: 'スタッフへ公開', action: () => A().transition('SHIFT_PUBLISH') },
         { label: 'ログアウト', action: () => A().logout() },
 
-        // ── Week3: 出退勤フェーズ ──
+        // -- Week3: 出退勤フェーズ --
         { label: '【Week3】田中花子：出勤8/1', action: () => {
             A().setClockIn(7,'10:02');
             A().setWorking(7);
@@ -451,7 +451,7 @@ const SCENARIO_GROUPS = [
             A().setClockOut(12,'21:00'); A().transition('CLOCK_OUT'); A().logout();
         }},
 
-        // ── Week3後半: 欠勤発生 ──
+        // -- Week3後半: 欠勤発生 --
         { label: '木村蓮：欠勤申請8/4', action: () => {
             A().loginAsStaff(15);
             A().setStaffState(15,'欠勤申請中');
@@ -463,7 +463,7 @@ const SCENARIO_GROUPS = [
             A().logout();
         }},
 
-        // ── Week4: 勤怠確定 ──
+        // -- Week4: 勤怠確定 --
         { label: '【Week4】山田太郎：勤怠確定', action: () => {
             A().loginAsStaff(3);
             [7,10,12].forEach(id=>{
@@ -523,9 +523,9 @@ const SCENARIO_GROUPS = [
     ]
   },
 
-  /* ──────────────────────────────────────
+  /* --------------------------------------
      3ヶ月間シミュレーション
-  ────────────────────────────────────── */
+  -------------------------------------- */
   {
     id: 'months3', label: '3ヶ月間シミュレーション', cls: 'g-3months',
     scenarios: [
@@ -533,7 +533,7 @@ const SCENARIO_GROUPS = [
       { title: '7-9月：渋谷店フル稼働', steps: [
         { label: 'リセット', action: () => A().reset() },
 
-        // ─ 7月 ─
+        // - 7月 -
         { label: '【7月】田中花子・加藤健太：希望提出', action: () => {
             [[7,['2025-07-01','2025-07-08','2025-07-15','2025-07-22']],[10,['2025-07-03','2025-07-10','2025-07-17','2025-07-24']]].forEach(([sid,dates])=>{
                 A().loginAsStaff(sid);
@@ -556,7 +556,7 @@ const SCENARIO_GROUPS = [
             A().loginAsStaff(1); A().jumpToState('給与未計算'); A().transition('SALARY_CALC'); A().logout();
         }},
 
-        // ─ 8月 ─
+        // - 8月 -
         { label: '【8月】全員：希望提出', action: () => {
             [[7,['2025-08-05','2025-08-12','2025-08-19','2025-08-26']],[10,['2025-08-07','2025-08-14','2025-08-21','2025-08-28']],[12,['2025-08-06','2025-08-13','2025-08-20','2025-08-27']],[15,['2025-08-08','2025-08-15','2025-08-22','2025-08-29']]].forEach(([sid,dates])=>{
                 A().loginAsStaff(sid);
@@ -581,7 +581,7 @@ const SCENARIO_GROUPS = [
             A().loginAsStaff(1); A().jumpToState('給与未計算'); A().transition('SALARY_CALC'); A().logout();
         }},
 
-        // ─ 9月 ─
+        // - 9月 -
         { label: '【9月】3名で希望提出（木村は復帰）', action: () => {
             [[7,['2025-09-02','2025-09-09','2025-09-16']],[10,['2025-09-04','2025-09-11','2025-09-18']],[15,['2025-09-03','2025-09-10','2025-09-17']]].forEach(([sid,dates])=>{
                 A().loginAsStaff(sid); A().setStaffState(sid,'未ログイン');
@@ -642,9 +642,9 @@ const SCENARIO_GROUPS = [
   },
 ];
 
-/* ═══════════════════════════════════
+/* ===================================
    ランナー本体
-═══════════════════════════════════ */
+=================================== */
 let API = null;
 let currentGroupId  = 'unit';
 let currentScenIdx  = 0;
@@ -670,34 +670,70 @@ let selectedLogStep = -1;
 const frame = document.getElementById('app-frame');
 
 /* iframe接続ポーリング */
+function onAPIConnected(api) {
+  API = api;
+  API.on((event, data) => {
+    document.getElementById('preview-state').textContent = data.state || '—';
+    document.getElementById('preview-who').textContent = data.staff ? '（' + data.staff + '）' : '';
+  });
+  document.getElementById('preview-state').textContent = '接続済み';
+  document.getElementById('btn-run').disabled = false;
+  document.getElementById('btn-custom-run').disabled = false;
+  renderScenarioList();
+}
+
 function connectAPI() {
   let attempts = 0;
+  log('info', '接続中…', 'ShiftAPIを探しています');
   const poll = setInterval(() => {
     attempts++;
+    let api = null;
+    let errMsg = '';
     try {
-      const api = frame.contentWindow?.ShiftAPI;
-      if (api && typeof api.reset === 'function') {
-        clearInterval(poll);
-        API = api;
-        API.on((event, data) => {
-          document.getElementById('preview-state').textContent = data.state || '—';
-          const who = document.getElementById('preview-who');
-          who.textContent = data.staff ? '（' + data.staff + '）' : '';
-        });
-        document.getElementById('preview-state').textContent = '接続済み';
-        document.getElementById('btn-run').disabled = false;
-        document.getElementById('btn-custom-run').disabled = false;
-        log('info', 'システム接続完了', attempts * 200 + 'ms');
-        renderScenarioList();
-      } else if (attempts >= 40) {
-        clearInterval(poll);
-        log('error', '接続タイムアウト', 'ページを再読み込みしてください');
-      }
-    } catch(e) {}
+      api = frame.contentWindow?.ShiftAPI;
+    } catch(e) {
+      errMsg = e.message;
+    }
+
+    if (api && typeof api.reset === 'function') {
+      clearInterval(poll);
+      onAPIConnected(api);
+      log('info', 'システム接続完了', attempts * 200 + 'ms');
+      return;
+    }
+
+    // 状態をステータスバーに表示
+    const statusEl = document.getElementById('preview-state');
+    if (errMsg) {
+      statusEl.textContent = 'エラー: ' + errMsg.slice(0, 30);
+    } else if (!api) {
+      statusEl.textContent = '接続待ち… ' + (attempts * 200 / 1000).toFixed(1) + 's';
+    }
+
+    if (attempts >= 50) { // 10秒
+      clearInterval(poll);
+      statusEl.textContent = 'タイムアウト';
+      log('error', '接続タイムアウト（10秒）',
+        errMsg
+          ? 'エラー: ' + errMsg + ' → ローカルサーバーで開いてください'
+          : 'ShiftAPIが見つかりません。index.htmlと同じフォルダに置いてください'
+      );
+      // 手動再試行ボタンを表示
+      const retryBtn = document.createElement('button');
+      retryBtn.textContent = '再試行';
+      retryBtn.className = 'btn btn-run';
+      retryBtn.style.cssText = 'margin-left:8px;font-size:11px;padding:4px 10px';
+      retryBtn.onclick = () => { retryBtn.remove(); connectAPI(); };
+      document.querySelector('.control-toolbar').appendChild(retryBtn);
+    }
   }, 200);
 }
-frame.addEventListener('load', connectAPI);
-if (frame.contentDocument?.readyState === 'complete') connectAPI();
+
+frame.addEventListener('load', () => { setTimeout(connectAPI, 100); });
+// すでにロード済みの場合
+if (frame.contentDocument?.readyState === 'complete') {
+  setTimeout(connectAPI, 300);
+}
 
 /* shorthand */
 function A() { return API; }
@@ -717,21 +753,21 @@ document.getElementById('speed-range').addEventListener('input', function() {
 });
 function getDelay() { return Number(document.getElementById('speed-range').value); }
 
-/* ── シナリオリスト描画 ── */
+/* -- シナリオリスト描画 -- */
 function renderScenarioList() {
   const pane = document.getElementById('scenario-pane');
   pane.innerHTML = SCENARIO_GROUPS.map(g => {
     const rows = g.scenarios.map((sc, i) => {
       const active = g.id === currentGroupId && i === currentScenIdx;
       return '<button class="scenario-btn' + (active?' active':'') + '" onclick="selectScenario(\'' + g.id + '\',' + i + ')">'
-        + '<span class="s-tag ' + g.id + '">' + g.scenarios.length + '/' + (i+1) + '</span>'
+        + '<span class="s-tag ' + g.id + '">' + g.scenarios.length + '/' + (i+1) + '<\/span>'
         + sc.title
-        + ' <span style="color:var(--text-3);font-size:10px">（' + sc.steps.length + 'ステップ）</span>'
-        + '</button>';
+        + ' <span style="color:var(--text-3);font-size:10px">（' + sc.steps.length + 'ステップ）<\/span>'
+        + '<\/button>';
     }).join('');
     return '<div class="scenario-group">'
-      + '<div class="scenario-group-header ' + g.cls + '"><i class="ti ti-' + (g.id==='unit'?'test-pipe':g.id==='days30'?'calendar-month':'calendar-stats') + '"></i> ' + g.label + '</div>'
-      + rows + '</div>';
+      + '<div class="scenario-group-header ' + g.cls + '"><i class="ti ti-' + (g.id==='unit'?'test-pipe':g.id==='days30'?'calendar-month':'calendar-stats') + '"><\/i> ' + g.label + '<\/div>'
+      + rows + '<\/div>';
   }).join('');
 }
 
@@ -747,7 +783,7 @@ function selectScenario(groupId, idx) {
   document.getElementById('progress-bar').style.width = '0%';
 }
 
-/* ── 実行制御 ── */
+/* -- 実行制御 -- */
 function runScenario() {
   if (!API) return;
   const g = SCENARIO_GROUPS.find(g => g.id === currentGroupId);
@@ -813,7 +849,7 @@ function resetAll() {
   log('info', 'リセット完了', 'データを初期化しました');
 }
 
-/* ── ステップ実行 ── */
+/* -- ステップ実行 -- */
 function runNext() {
   if (!running || paused || stopped) return;
   if (stepIdx >= steps.length) {
@@ -856,16 +892,16 @@ function runNext() {
   timer = setTimeout(runNext, getDelay());
 }
 
-/* ── ログUI ── */
+/* -- ログUI -- */
 function renderStepLog() {
   const el = document.getElementById('step-log');
   el.innerHTML = steps.map((s,i) =>
     '<div class="step-item" id="step-'+i+'">'
-    + '<span class="step-icon idle"><i class="ti ti-circle"></i></span>'
-    + '<div><div class="step-label">'+s.label+'</div>'
-    + (s.detail?'<div class="step-detail">'+s.detail+'</div>':'')+'</div>'
-    + '<span class="step-status" id="step-status-'+i+'"></span>'
-    + '</div>'
+    + '<span class="step-icon idle"><i class="ti ti-circle"><\/i><\/span>'
+    + '<div><div class="step-label">'+s.label+'<\/div>'
+    + (s.detail?'<div class="step-detail">'+s.detail+'<\/div>':'')+'<\/div>'
+    + '<span class="step-status" id="step-status-'+i+'"><\/span>'
+    + '<\/div>'
   ).join('');
 }
 
@@ -877,7 +913,7 @@ function updateStepUI(idx, state, msg) {
   const map={ok:{cls:'ok',icon:'ti-check',text:'✓'},error:{cls:'error',icon:'ti-x',text:'NG'},run:{cls:'run',icon:'ti-loader-2',text:'…'},idle:{cls:'idle',icon:'ti-circle',text:''}};
   const m=map[state]||map.idle;
   icon.className='step-icon '+m.cls;
-  icon.innerHTML='<i class="ti '+m.icon+'"></i>';
+  icon.innerHTML='<i class="ti '+m.icon+'"><\/i>';
   status.textContent=msg||m.text;
   if(state==='run') item.scrollIntoView({block:'nearest'});
 }
@@ -887,14 +923,14 @@ function log(type, label, detail) {
   const el=document.getElementById('step-log');
   const div=document.createElement('div');
   div.className='step-item';
-  div.innerHTML='<span class="step-icon '+type+'"><i class="ti '+(icons[type]||'ti-info-circle')+'"></i></span>'
-    +'<div><div class="step-label">'+label+'</div>'+(detail?'<div class="step-detail">'+detail+'</div>':'')+'</div>'
-    +'<span class="step-status">'+new Date().toLocaleTimeString('ja-JP')+'</span>';
+  div.innerHTML='<span class="step-icon '+type+'"><i class="ti '+(icons[type]||'ti-info-circle')+'"><\/i><\/span>'
+    +'<div><div class="step-label">'+label+'<\/div>'+(detail?'<div class="step-detail">'+detail+'<\/div>':'')+'<\/div>'
+    +'<span class="step-status">'+new Date().toLocaleTimeString('ja-JP')+'<\/span>';
   el.appendChild(div);
   div.scrollIntoView({block:'nearest'});
 }
 
-/* ── カスタムシナリオ ── */
+/* -- カスタムシナリオ -- */
 function toggleCustomPanel() {
   const p=document.getElementById('custom-panel');
   p.style.display=p.style.display==='none'?'flex':'none';
@@ -957,9 +993,9 @@ function loadAndRun() {
 /* 初期化 */
 renderScenarioList();
 
-/* ═══════════════════════════════════
+/* ===================================
    システムログパネル
-═══════════════════════════════════ */
+=================================== */
 function showLogPanel() {
   if (!sysLog.steps.length) { log('warn', 'ログなし', 'まずシナリオを実行してください'); return; }
   renderLogPanel();
@@ -968,33 +1004,33 @@ function showLogPanel() {
 function closeLogPanel() { document.getElementById('log-panel').style.display = 'none'; }
 
 function renderLogPanel() {
-  // ── ステップ一覧 ──
+  // -- ステップ一覧 --
   const list = document.getElementById('log-step-list');
   list.innerHTML = sysLog.steps.map((s, i) => {
     const cls = s.result === 'ok' ? '#2d7a4f' : s.result === 'assert' ? '#b07010' : '#a32d2d';
     const icon = s.result === 'ok' ? '✓' : s.result === 'assert' ? '⚠' : '✗';
     const active = i === selectedLogStep;
     return '<div onclick="selectLogStep(' + i + ')" style="padding:6px 12px;border-bottom:.5px solid #e0ded8;cursor:pointer;background:' + (active ? '#e6f1fb' : 'transparent') + ';display:flex;gap:6px;align-items:start">'
-      + '<span style="color:' + cls + ';font-size:13px;flex-shrink:0">' + icon + '</span>'
-      + '<div><div style="font-size:11px;font-weight:600;color:#1a1a18;line-height:1.3">' + s.label + '</div>'
-      + (s.detail ? '<div style="font-size:10px;color:#909088">' + s.detail + '</div>' : '')
-      + (s.error ? '<div style="font-size:10px;color:#a32d2d">' + s.error.slice(0,60) + '</div>' : '')
-      + '</div></div>';
+      + '<span style="color:' + cls + ';font-size:13px;flex-shrink:0">' + icon + '<\/span>'
+      + '<div><div style="font-size:11px;font-weight:600;color:#1a1a18;line-height:1.3">' + s.label + '<\/div>'
+      + (s.detail ? '<div style="font-size:10px;color:#909088">' + s.detail + '<\/div>' : '')
+      + (s.error ? '<div style="font-size:10px;color:#a32d2d">' + s.error.slice(0,60) + '<\/div>' : '')
+      + '<\/div><\/div>';
   }).join('');
 
-  // ── 整合性チェック結果 ──
+  // -- 整合性チェック結果 --
   const ic = sysLog.integrityAfter || sysLog.integrityBefore;
   const badge = document.getElementById('log-integrity-badge');
   const footer = document.getElementById('log-integrity');
   if (ic) {
     if (ic.ok) {
       badge.textContent = '✓ 整合性OK'; badge.style.cssText = 'background:#eaf3de;color:#2d7a4f;margin-left:auto;font-size:10px;padding:2px 8px;border-radius:8px';
-      footer.innerHTML = '<span style="color:#2d7a4f;font-weight:600">✓ データ整合性チェック: 問題なし</span>';
+      footer.innerHTML = '<span style="color:#2d7a4f;font-weight:600">✓ データ整合性チェック: 問題なし<\/span>';
     } else {
       badge.textContent = '⚠ 不整合 ' + ic.errors.length + '件'; badge.style.cssText = 'background:#faeeda;color:#b07010;margin-left:auto;font-size:10px;padding:2px 8px;border-radius:8px';
-      footer.innerHTML = '<span style="color:#b07010;font-weight:600">⚠ データ整合性チェック: ' + ic.errors.length + '件の不整合</span>'
+      footer.innerHTML = '<span style="color:#b07010;font-weight:600">⚠ データ整合性チェック: ' + ic.errors.length + '件の不整合<\/span>'
         + '<ul style="margin:4px 0 0 16px;color:#a32d2d;font-size:11px">'
-        + ic.errors.map(e => '<li>' + e + '</li>').join('') + '</ul>';
+        + ic.errors.map(e => '<li>' + e + '<\/li>').join('') + '<\/ul>';
     }
   }
 
@@ -1028,9 +1064,7 @@ function selectLogStep(i) {
       if (JSON.stringify(bs[k]) !== JSON.stringify(as[k]))
         changes.push('  ' + k + ': ' + JSON.stringify(bs[k]) + ' → ' + JSON.stringify(as[k]));
     });
-    return as.name + ' (' + as.store + ')
-' + changes.join('
-');
+    return as.name + ' (' + as.store + ')\n' + changes.join('\n');
   });
 
   const diffRequests = after.shiftRequests.length !== before.shiftRequests.length
@@ -1038,8 +1072,7 @@ function selectLogStep(i) {
   const diffConfirmed = after.confirmedShifts.length !== before.confirmedShifts.length
     ? '  confirmedShifts: ' + before.confirmedShifts.length + '件 → ' + after.confirmedShifts.length + '件' : '';
   const diffPhase = Object.entries(after.shiftPhase).filter(([k,v]) => before.shiftPhase[k] !== v)
-    .map(([k,v]) => '  shiftPhase[' + k + ']: ' + before.shiftPhase[k] + ' → ' + v).join('
-');
+    .map(([k,v]) => '  shiftPhase[' + k + ']: ' + before.shiftPhase[k] + ' → ' + v).join('\n');
   const diffState = before.appState.currentState !== after.appState.currentState
     ? '  currentState: ' + before.appState.currentState + ' → ' + after.appState.currentState : '';
   const diffWho = (before.appState.currentStaff?.name||'なし') !== (after.appState.currentStaff?.name||'なし')
@@ -1048,38 +1081,20 @@ function selectLogStep(i) {
   const hasDiff = diffStaff.length || diffRequests || diffConfirmed || diffPhase || diffState || diffWho;
 
   detail.textContent =
-    '【ステップ ' + (i+1) + '】 ' + step.label + '
-'
-    + (step.detail ? '詳細: ' + step.detail + '
-' : '')
-    + '結果: ' + (step.result === 'ok' ? '✓ 成功' : step.result === 'assert' ? '⚠ アサーション失敗' : '✗ エラー') + '
-'
-    + (step.error ? 'エラー: ' + step.error + '
-' : '')
-    + '
-── 変化したデータ ──
-'
+    '【ステップ ' + (i+1) + '】 ' + step.label + '\n'
+    + (step.detail ? '詳細: ' + step.detail + '\n' : '')
+    + '結果: ' + (step.result === 'ok' ? '✓ 成功' : step.result === 'assert' ? '⚠ アサーション失敗' : '✗ エラー') + '\n'
+    + (step.error ? 'エラー: ' + step.error + '\n' : '')
+    + '\n-- 変化したデータ --\n'
     + (hasDiff
-        ? (diffState ? diffState + '
-' : '')
-          + (diffWho ? diffWho + '
-' : '')
-          + (diffRequests ? diffRequests + '
-' : '')
-          + (diffConfirmed ? diffConfirmed + '
-' : '')
-          + (diffPhase ? diffPhase + '
-' : '')
-          + (diffStaff.length ? '
-スタッフ変化:
-' + diffStaff.join('
-
-') : '')
+        ? (diffState ? diffState + '\n' : '')
+          + (diffWho ? diffWho + '\n' : '')
+          + (diffRequests ? diffRequests + '\n' : '')
+          + (diffConfirmed ? diffConfirmed + '\n' : '')
+          + (diffPhase ? diffPhase + '\n' : '')
+          + (diffStaff.length ? '\nスタッフ変化:\n' + diffStaff.join('\n\n') : '')
         : '（変化なし）')
-    + '
-
-── 操作後のスナップショット ──
-'
+    + '\n\n-- 操作後のスナップショット --\n'
     + JSON.stringify({ appState: after.appState, shiftPhase: after.shiftPhase, confirmedShifts: after.confirmedShifts, pendingShifts: after.pendingShifts }, null, 2);
 }
 
