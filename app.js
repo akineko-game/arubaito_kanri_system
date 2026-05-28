@@ -2084,7 +2084,10 @@ function showTimeline(mode) {
   document.getElementById(tabId)?.classList.add('next-target');
 
   const today = new Date();
-  const todayStr = today.toISOString().slice(0,10);
+  // JST（ローカル時刻）で今日の日付を取得（toISOStringはUTCのため日本では1日ずれる場合あり）
+  const todayStr = today.getFullYear() + '-'
+    + String(today.getMonth() + 1).padStart(2, '0') + '-'
+    + String(today.getDate()).padStart(2, '0');
 
   // confirmedShiftsの日付一覧（この店舗）
   const storeConfirmedDates = (DEMO.confirmedShifts || [])
@@ -2092,8 +2095,8 @@ function showTimeline(mode) {
     .map(c => c.date)
     .sort();
 
-  // デモデータの基準日：確定シフトがあればその最初の日、なければ今日
-  const demoBaseDate = storeConfirmedDates.length > 0 ? storeConfirmedDates[0] : todayStr;
+  // 基準日：常に今日（todayStr）を使用
+  const demoBaseDate = todayStr;
 
   // 日付ピッカーの範囲を決定
   const rangeLabel = { today:'当日', range:'前後30日', future:'今後3ヶ月' }[mode];
@@ -2129,15 +2132,17 @@ function showTimeline(mode) {
     const base = new Date(demoBaseDate);
     const dm30 = new Date(base); dm30.setDate(dm30.getDate() - 30);
     const dp30 = new Date(base); dp30.setDate(dp30.getDate() + 30);
-    minDate = dm30.toISOString().slice(0,10);
-    maxDate = dp30.toISOString().slice(0,10);
+    const fmt = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    minDate = fmt(dm30);
+    maxDate = fmt(dp30);
     defaultDate = demoBaseDate;
   } else {
     // 今後3ヶ月：デモ基準日から
     const base = new Date(demoBaseDate);
     const d3m  = new Date(base); d3m.setMonth(d3m.getMonth() + 3);
+    const fmt2 = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     minDate = demoBaseDate;
-    maxDate = d3m.toISOString().slice(0,10);
+    maxDate = fmt2(d3m);
     defaultDate = demoBaseDate;
   }
 
@@ -2171,15 +2176,13 @@ function renderTimelineFor(dateStr, store) {
   const DOW = ['日','月','火','水','木','金','土'];
   const d   = new Date(dateStr);
   const label = dateStr.slice(5).replace('-','/') + '（' + DOW[d.getDay()] + '）';
-  const todayStr = new Date().toISOString().slice(0,10);
-  // デモデータ基準：confirmedShiftsの最初の日を「当日」として扱う
-  const storeConfirmedAll = (DEMO.confirmedShifts || [])
-    .filter(c => { const st2 = DEMO.staff.find(s => s.id === c.staffId); return st2?.store === store; })
-    .map(c => c.date).sort();
-  const demoPivot = storeConfirmedAll[0] || todayStr;
-  const isPast   = dateStr < demoPivot;
-  const isToday  = dateStr === demoPivot;
-  const isFuture = dateStr > demoPivot;
+  const _now = new Date();
+  const todayStr = _now.getFullYear() + '-'
+    + String(_now.getMonth() + 1).padStart(2, '0') + '-'
+    + String(_now.getDate()).padStart(2, '0');
+  const isPast   = dateStr < todayStr;
+  const isToday  = dateStr === todayStr;
+  const isFuture = dateStr > todayStr;
 
   // この日のconfirmedShifts（この店舗）
   const storePartIds = new Set(
