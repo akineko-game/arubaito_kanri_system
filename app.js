@@ -234,10 +234,17 @@ function doLogin({ staffId, password }) {
     appState.breakStart = new Date(Date.now() - (staff.breakMin || 10) * 60000);
   }
 
-  // LOGIN event_route の to は SHIFT_REQ_PENDING だが、
-  // スタッフが既に別の状態にいる場合はその状態を使う
-  // → transition() 内で currentState を上書きする前に state を保存
-  appState._loginTargetState = staff.state !== STATES.LOGGED_OUT ? staff.state : null;
+  // ロール別のログイン後初期状態を決定
+  const defaultStateByRole = {
+    [ROLES.ADMIN]:     STATES.ATTENDANCE_PENDING, // 管理者 → 勤怠確定が最初の仕事
+    [ROLES.MANAGER]:   STATES.SHIFT_CREATING,     // 店長 → シフト作成が最初の仕事
+    [ROLES.PART_TIME]: STATES.SHIFT_REQ_PENDING,  // アルバイト → 勤務希望提出
+  };
+  // スタッフ自身の state が LOGGED_OUT 以外なら優先、そうでなければロール別デフォルト
+  const targetState = staff.state !== STATES.LOGGED_OUT
+    ? staff.state
+    : (defaultStateByRole[staff.role] || STATES.SHIFT_REQ_PENDING);
+  appState._loginTargetState = targetState;
   return true;
 }
 
@@ -1484,7 +1491,6 @@ function loginAsStaff(staffId) {
 
   appState.currentStaff  = staff;
   appState.currentRole   = staff.role;
-  appState.currentState  = staff.state;
   appState.sessionExpiry = new Date(Date.now() + RULES.SESSION_HOURS * 3600 * 1000);
   appState.workStart     = null;
   appState.breakStart    = null;
@@ -1496,15 +1502,25 @@ function loginAsStaff(staffId) {
     appState.breakStart = new Date(Date.now() - (staff.breakMin || 10) * 60000);
   }
 
-  // 店長・管理者のシフトフェーズから現在状態を復元
+  // ロール別デフォルト初期状態（スタッフ自身のstateがLOGGED_OUTの場合）
+  const defaultStateByRole = {
+    [ROLES.ADMIN]:     STATES.ATTENDANCE_PENDING,
+    [ROLES.MANAGER]:   STATES.SHIFT_CREATING,
+    [ROLES.PART_TIME]: STATES.SHIFT_REQ_PENDING,
+  };
+  let targetState = staff.state !== STATES.LOGGED_OUT
+    ? staff.state
+    : (defaultStateByRole[staff.role] || STATES.SHIFT_REQ_PENDING);
+
+  // 店長・管理者のシフトフェーズから状態を復元
   if (staff.role === ROLES.MANAGER) {
     const phase = DEMO.shiftPhase?.[staff.store];
-    if (phase === 'confirmed' && appState.currentState === STATES.SHIFT_CREATING) {
-      appState.currentState = STATES.SHIFT_CONFIRMED;
-    } else if (phase === 'published' && (appState.currentState === STATES.SHIFT_CREATING || appState.currentState === STATES.SHIFT_CONFIRMED)) {
-      appState.currentState = STATES.SHIFT_PUBLISHED;
-    }
+    if (phase === 'confirmed') targetState = STATES.SHIFT_CONFIRMED;
+    else if (phase === 'published') targetState = STATES.SHIFT_PUBLISHED;
+    else targetState = STATES.SHIFT_CREATING;
   }
+
+  appState.currentState = targetState;
   logT('STAFF_LOGIN', `${staff.name}（${ROLE_LABEL[staff.role]}・${staff.store}）でログイン`);
   updateGuideOnStateChange();
   window.scrollTo({ top: 0, behavior: 'smooth' });
