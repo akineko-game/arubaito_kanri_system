@@ -184,7 +184,18 @@ function transition(eventName, payload = {}) {
   const prev = appState.currentState;
 
   switch (eventName) {
-    case 'LOGIN':              if (!doLogin(payload)) return false; break;
+    case 'LOGIN':
+      if (!doLogin(payload)) return false;
+      // doLogin内でセットした_loginTargetStateをroute.toより優先する
+      if (appState._loginTargetState) {
+        appState.currentState = appState._loginTargetState;
+        appState._loginTargetState = null;
+        updateStaff({ state: appState.currentState });
+        logT('LOGIN', `${appState.currentStaff?.name} ログイン → ${appState.currentState}`);
+        updateGuideOnStateChange();
+        return true;
+      }
+      break;
     case 'SHIFT_REQUEST_SUBMIT': doShiftSubmit(payload); break;
     case 'SHIFT_CONFIRM':        if (!doShiftConfirm()) return false; break;
     case 'SHIFT_PUBLISH':        doShiftPublish(); break;
@@ -380,15 +391,7 @@ const _originalUpdate = updateGuideOnStateChange;
 const _realTransition = transition;
 // パッチ: LOGINイベント後にスタッフの実状態へ戻す
 function patchedTransition(eventName, payload = {}) {
-  const result = _realTransition(eventName, payload);
-  if (eventName === 'LOGIN' && result && appState._loginTargetState) {
-    appState.currentState = appState._loginTargetState;
-    appState._loginTargetState = null;
-    // 再レンダーはupdateGuideOnStateChange()が既に呼ばれているので
-    // 状態だけ変えてもう一度レンダー
-    updateGuideOnStateChange();
-  }
-  return result;
+  return transition(eventName, payload);
 }
 
 /* ═══════════════════════════════════════
