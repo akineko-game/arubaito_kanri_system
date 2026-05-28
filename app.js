@@ -563,13 +563,16 @@ function updateClockButtons() {
     const staff = appState.currentStaff;
     if (!staff) return;
 
+    const isPartTime = appState.currentRole === ROLES.PART_TIME;
     const todayShift = findShiftForStaffByDate(staff?.id, getTodayISO());
     const storeOpen = getStoreState(staff.store) === STORE_STATES.OPEN;
+    // アルバイトはシフト必須、店長・管理者はシフト不問
+    const shiftOk = isPartTime ? todayShift !== null : true;
 
-    const canClockIn = appState.currentState === STATES.PRE_WORK && todayShift !== null && storeOpen;
-    const canBreakStart = appState.currentState === STATES.WORKING && todayShift !== null && storeOpen;
-    const canBreakEnd = appState.currentState === STATES.ON_BREAK && todayShift !== null && storeOpen;
-    const canClockOut = appState.currentState === STATES.WORKING && todayShift !== null && storeOpen;
+    const canClockIn   = appState.currentState === STATES.PRE_WORK   && shiftOk && storeOpen;
+    const canBreakStart= appState.currentState === STATES.WORKING     && shiftOk && storeOpen;
+    const canBreakEnd  = appState.currentState === STATES.ON_BREAK    && shiftOk && storeOpen;
+    const canClockOut  = appState.currentState === STATES.WORKING     && shiftOk && storeOpen;
 
     const btnClockIn = document.getElementById('btn-clock-in');
     const btnBreakStart = document.getElementById('btn-break-start');
@@ -722,11 +725,14 @@ function doShiftSubmit(payload) {
 }
 
 function doClockin() {
-  // ─── シフト有無チェック（最優先ガード） ───────────────────────
-  const todayShift = findShiftForStaffByDate(appState.currentStaff?.id, getTodayISO());
-  if (!todayShift) {
-    showError('本日のシフトがありません。打刻できません。シフトに誤りがある場合は店長へご連絡ください。');
-    return;
+  const role = appState.currentRole;
+  // ─── シフト有無チェック（アルバイトのみ） ────────────────────
+  if (role === ROLES.PART_TIME) {
+    const todayShift = findShiftForStaffByDate(appState.currentStaff?.id, getTodayISO());
+    if (!todayShift) {
+      showError('本日のシフトがありません。打刻できません。シフトに誤りがある場合は店長へご連絡ください。');
+      return;
+    }
   }
   // ─── 店舗営業状態チェック ─────────────────────────────────────
   if (getStoreState(appState.currentStaff?.store) !== STORE_STATES.OPEN) {
@@ -1363,19 +1369,22 @@ function buildView(state) {
   // ─── 出勤前 ─────────────────────────────────
   if (state === STATES.PRE_WORK) {
     const wifiOk = appState.wifiConnected;
+    const role = appState.currentRole;
+    const isPartTime = role === ROLES.PART_TIME;
     const todayShift = findShiftForStaffByDate(st?.id, getTodayISO());
     const shiftText = formatShiftForDisplay(todayShift, st);
-    const shiftClass = todayShift ? 'badge-ok' : 'badge-error';
-    // シフトなし or 店舗クローズの場合は打刻ボタンを無効化
+    // シフト表示：アルバイトはシフト必須、店長・管理者は参考表示のみ
+    const shiftClass = todayShift ? 'badge-ok' : (isPartTime ? 'badge-error' : 'badge-warn');
     const storeOpen = getStoreState(st?.store) === STORE_STATES.OPEN;
-    const clockInEnabled = todayShift !== null && storeOpen;
+    // 打刻可否：アルバイトはシフト必須、店長・管理者はシフト不問（店舗営業中であれば可）
+    const clockInEnabled = storeOpen && (isPartTime ? todayShift !== null : true);
     return `
       <div class="view-card">
         <h2 class="view-title"><i class="ti ti-clock"></i> 出勤前</h2>
         ${staffChip(st)}
         <div class="info-row"><span class="info-label">本日シフト</span><span class="${shiftClass}">${shiftText}</span></div>
-        ${!todayShift ? `<div class="warn-box" style="margin-bottom:12px"><i class="ti ti-calendar-x"></i> <strong>本日のシフトがありません。</strong>打刻できません。<br>シフトに誤りがある場合は店長へご連絡ください。</div>` : ''}
-        ${!storeOpen && todayShift ? `<div class="warn-box" style="margin-bottom:12px"><i class="ti ti-lock"></i> 現在、店舗が営業していません。打刻できません。</div>` : ''}
+        ${isPartTime && !todayShift ? `<div class="warn-box" style="margin-bottom:12px"><i class="ti ti-calendar-x"></i> <strong>本日のシフトがありません。</strong>打刻できません。<br>シフトに誤りがある場合は店長へご連絡ください。</div>` : ''}
+        ${!storeOpen ? `<div class="warn-box" style="margin-bottom:12px"><i class="ti ti-lock"></i> 現在、店舗が営業していません。打刻できません。</div>` : ''}
         <div class="info-row"><span class="info-label">Wi-Fi</span>
           <span class="${wifiOk ? 'badge-ok' : 'badge-error'}">${wifiOk ? '接続中' : '未接続'}</span>
         </div>
@@ -3422,27 +3431,25 @@ function enforceClockButtons() {
     const staff = appState.currentStaff;
     if (!staff) return;
 
+    const isPartTime = appState.currentRole === ROLES.PART_TIME;
     const todayShift = findShiftForStaffByDate(staff?.id, getTodayISO());
     const storeOpen = getStoreState(staff.store) === STORE_STATES.OPEN;
-
-    const canClockIn = staff && appState.currentState === STATES.PRE_WORK && todayShift !== null && storeOpen;
-    const canBreakStart = staff && appState.currentState === STATES.WORKING && todayShift !== null && storeOpen;
-    const canBreakEnd = staff && appState.currentState === STATES.ON_BREAK && todayShift !== null && storeOpen;
-    const canClockOut = staff && appState.currentState === STATES.WORKING && todayShift !== null && storeOpen;
+    // アルバイトはシフト必須、店長・管理者はシフト不問
+    const shiftOk = isPartTime ? todayShift !== null : true;
 
     ['btn-clock-in','btn-break-start','btn-break-end','btn-clock-out'].forEach(id => {
         const btn = document.getElementById(id);
         if(btn) btn.disabled = true; // 初期無効化
     });
 
-    if(appState.currentState === STATES.PRE_WORK && todayShift !== null && storeOpen) {
+    if(appState.currentState === STATES.PRE_WORK && shiftOk && storeOpen) {
         const btn = document.getElementById('btn-clock-in'); if(btn) btn.disabled = false;
     }
-    if(appState.currentState === STATES.WORKING && todayShift !== null && storeOpen) {
+    if(appState.currentState === STATES.WORKING && shiftOk && storeOpen) {
         const btn1 = document.getElementById('btn-break-start'); if(btn1) btn1.disabled = false;
         const btn2 = document.getElementById('btn-clock-out'); if(btn2) btn2.disabled = false;
     }
-    if(appState.currentState === STATES.ON_BREAK && todayShift !== null && storeOpen) {
+    if(appState.currentState === STATES.ON_BREAK && shiftOk && storeOpen) {
         const btn = document.getElementById('btn-break-end'); if(btn) btn.disabled = false;
     }
 }
