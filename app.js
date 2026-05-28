@@ -904,11 +904,25 @@ function getProgressModel() {
 
 function getCurrentProgress() {
   const model = getProgressModel();
-  // ON_BREAK はステッパーに含まれない場合、WORKING として表示する
-  const lookupState = appState.currentState === STATES.ON_BREAK &&
-    !model.find(s => s.state === STATES.ON_BREAK)
-    ? STATES.WORKING
-    : appState.currentState;
+  let lookupState = appState.currentState;
+
+  // clock / clock_break モデル使用中（打刻タブ・店長管理者）の状態マッピング
+  const isClockModel = appState.clockTabActive &&
+    (appState.currentRole === ROLES.MANAGER || appState.currentRole === ROLES.ADMIN);
+  if (isClockModel) {
+    if (lookupState === STATES.PRE_WORK) {
+      // 出勤前：ログインを active（idx=0）、done は0件
+      // → LOGGED_OUT として検索することで idx=0 を確保
+      lookupState = STATES.LOGGED_OUT;
+    }
+    // ON_BREAK は clock_break モデルで末尾なので自動的に全緑
+  } else {
+    // 通常モデル：ON_BREAK がなければ WORKING として表示
+    if (lookupState === STATES.ON_BREAK && !model.find(s => s.state === STATES.ON_BREAK)) {
+      lookupState = STATES.WORKING;
+    }
+  }
+
   const idx = model.findIndex(s => s.state === lookupState);
   const i = idx < 0 ? 0 : idx;
   return { idx: i, total: model.length, pct: Math.round(i / Math.max(model.length - 1, 1) * 100), model };
