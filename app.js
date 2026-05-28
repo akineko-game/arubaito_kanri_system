@@ -601,6 +601,9 @@ function highlightNextTab() {
     [STATES.PRE_WORK]:            'tab-attendance',
     [STATES.WORKING]:             'tab-attendance',
     [STATES.ON_BREAK]:            'tab-attendance',
+    [STATES.OVERTIME_APPLYING]:   'tab-attendance',
+    [STATES.ABSENCE_APPLYING]:    'tab-absence',
+    [STATES.REPLACEMENT_OPEN]:    'tab-replace',
     [STATES.ATTENDANCE_PENDING]:  'tab-attendance',
     [STATES.SALARY_PENDING]:      'tab-salary',
     [STATES.NOTIFY_FAILED]:       'tab-notify',
@@ -1627,10 +1630,10 @@ function renderSidebar() {
         <button class="nav-tab" id="tab-attendance" onclick="jumpToState('出勤前')">
           <i class="ti ti-clock"></i>打刻
         </button>
-        <button class="nav-tab" onclick="jumpToState('欠勤申請中')">
+        <button class="nav-tab" id="tab-absence" onclick="showAbsencePanel()">
           <i class="ti ti-calendar-x"></i>欠勤申請
         </button>
-        <button class="nav-tab" onclick="showReplacementPanel()">
+        <button class="nav-tab" id="tab-replace" onclick="showReplacementPanel()">
           <i class="ti ti-repeat"></i>代替応募
         </button>
       </nav>
@@ -1791,6 +1794,60 @@ function gotoShiftPhase(forceCreating) {
 }
 
 /* ─── 代替応募パネル表示（サイドバーボタン用） ─── */
+/* ─── 欠勤申請パネル（サイドバーボタン用・状態を変えない） ─── */
+function showAbsencePanel() {
+  const me = appState.currentStaff;
+  if (!me) return;
+  const mainView = document.getElementById('main-view');
+  if (!mainView) return;
+
+  const myShifts = (DEMO.confirmedShifts || []).filter(c => c.staffId === me.id);
+  const DOW = ['日','月','火','水','木','金','土'];
+  const shiftOptions = myShifts.length > 0
+    ? myShifts.map(c => {
+        const d = new Date(c.date);
+        return `<option value="${c.date}">${c.date.slice(5).replace('-','/')}(${DOW[d.getDay()]}) ${c.start}〜${c.end}</option>`;
+      }).join('')
+    : '';
+
+  mainView.innerHTML = `
+    <div class="view-card">
+      <h2 class="view-title"><i class="ti ti-calendar-x"></i> 欠勤申請</h2>
+      <div class="info-row"><span class="info-label">スタッフ</span><span class="staff-name-chip">${me.name}（${me.store}）</span></div>
+      ${myShifts.length === 0
+        ? '<div class="warn-box"><i class="ti ti-info-circle"></i> 確定シフトがないため欠勤申請できません。シフト公開後に申請してください。</div>'
+        : `<div class="form-group">
+            <label>欠勤するシフト</label>
+            <select id="inp-absence-shift">${shiftOptions}</select>
+          </div>
+          <div class="form-group">
+            <label>欠勤理由</label>
+            <textarea id="inp-absence-reason" rows="3" placeholder="理由を入力してください"></textarea>
+          </div>
+          <button class="btn-warn" id="btn-absence-send-panel">欠勤申請を送信する</button>`
+      }
+      <p class="hint">承認後、店長が代替スタッフを手配します。</p>
+    </div>`;
+
+  const btn = document.getElementById('btn-absence-send-panel');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      const shiftDate = document.getElementById('inp-absence-shift')?.value;
+      const reason    = document.getElementById('inp-absence-reason')?.value || '';
+      if (!shiftDate) { showError('欠勤するシフトを選択してください'); return; }
+      appState.currentState = STATES.ABSENCE_APPLYING;
+      updateStaff({ state: STATES.ABSENCE_APPLYING, note: `欠勤申請: ${shiftDate} ${reason || '理由未記入'}` });
+      logT('ABSENCE_APPLY', `${me.name} が ${shiftDate} の欠勤を申請`);
+      showToast('欠勤申請を送信しました');
+      updateGuideOnStateChange();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('next-target'));
+  const tabEl = document.getElementById('tab-absence');
+  if (tabEl) tabEl.classList.add('next-target');
+}
+
 function showReplacementPanel() {
   const me = appState.currentStaff;
   if (!me) return;
@@ -1804,6 +1861,9 @@ function showReplacementPanel() {
   }
   updateGuideOnStateChange();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('next-target'));
+  const tabEl = document.getElementById('tab-replace');
+  if (tabEl) tabEl.classList.add('next-target');
 }
 
 /* ─── 代替応募（アルバイト用） ─── */
