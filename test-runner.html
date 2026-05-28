@@ -266,6 +266,28 @@
    シナリオ定義
    グループ: unit / days30 / months3 / custom
 =================================== */
+/* == 日付ユーティリティ（今日基準で動的生成） == */
+function today() {
+  const d = new Date();
+  return d.getFullYear() + '-'
+    + String(d.getMonth()+1).padStart(2,'0') + '-'
+    + String(d.getDate()).padStart(2,'0');
+}
+function addDays(base, n) {
+  const d = new Date(base + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.getFullYear() + '-'
+    + String(d.getMonth()+1).padStart(2,'0') + '-'
+    + String(d.getDate()).padStart(2,'0');
+}
+function addMonths(base, n) {
+  const d = new Date(base + 'T00:00:00');
+  d.setMonth(d.getMonth() + n);
+  return d.getFullYear() + '-'
+    + String(d.getMonth()+1).padStart(2,'0') + '-'
+    + String(d.getDate()).padStart(2,'0');
+}
+
 const SCENARIO_GROUPS = [
 
   /* --------------------------------------
@@ -292,9 +314,9 @@ const SCENARIO_GROUPS = [
       { title: '勤務希望提出フロー', steps: [
         { label: 'リセット',          action: () => A().reset() },
         { label: '田中花子ログイン',  action: () => A().loginAsStaff(7) },
-        { label: '希望を追加①',      action: () => { A().setFormValue('inp-shift-date','2025-08-05'); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); }, detail: '8/5 10-18' },
-        { label: '希望を追加②',      action: () => { A().setFormValue('inp-shift-date','2025-08-07'); A().setFormValue('inp-shift-start','13:00'); A().setFormValue('inp-shift-end','21:00'); F().addShiftRequest(); }, detail: '8/7 13-21' },
-        { label: '重複チェック',      action: () => { A().setFormValue('inp-shift-date','2025-08-05'); F().addShiftRequest(); }, detail: '同日は弾かれる' },
+        { label: '希望を追加①',      action: () => { A().setFormValue('inp-shift-date',addDays(today(),7)); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); }, detail: '今日+7日 10-18' },
+        { label: '希望を追加②',      action: () => { A().setFormValue('inp-shift-date',addDays(today(),9)); A().setFormValue('inp-shift-start','13:00'); A().setFormValue('inp-shift-end','21:00'); F().addShiftRequest(); }, detail: '今日+9日 13-21' },
+        { label: '重複チェック',      action: () => { A().setFormValue('inp-shift-date',addDays(today(),7)); F().addShiftRequest(); }, detail: '同日は弾かれる' },
         { label: '件数確認',          action: () => assert(A().getShiftRequests().filter(r=>r.staffId===7).length===2, '重複なし2件') },
         { label: '提出',              action: () => A().transition('SHIFT_REQUEST_SUBMIT') },
         { label: '状態確認',          action: () => assert(A().getCurrentState()==='勤務希望提出済', '提出済みに遷移') },
@@ -302,9 +324,9 @@ const SCENARIO_GROUPS = [
 
       { title: 'シフト作成・確定・公開', steps: [
         { label: 'リセット',          action: () => A().reset() },
-        { label: '田中花子：希望提出', action: () => { A().loginAsStaff(7); A().setFormValue('inp-shift-date','2025-08-05'); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); A().transition('SHIFT_REQUEST_SUBMIT'); A().logout(); } },
+        { label: '田中花子：希望提出', action: () => { A().loginAsStaff(7); A().setFormValue('inp-shift-date',addDays(today(),7)); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); A().transition('SHIFT_REQUEST_SUBMIT'); A().logout(); } },
         { label: '山田太郎ログイン',  action: () => A().loginAsStaff(3) },
-        { label: '割当確定',          action: () => A().confirmShift('2025-08-05', 7),  detail: '田中花子8/5' },
+        { label: '割当確定',          action: () => A().confirmShift(addDays(today(),7), 7), detail: '田中花子 今日+7' },
         { label: 'シフト確定',        action: () => A().transition('SHIFT_CONFIRM') },
         { label: '状態確認',          action: () => assert(A().getShiftPhase('渋谷店')==='confirmed', '確定済みフェーズ') },
         { label: 'スタッフへ公開',    action: () => A().transition('SHIFT_PUBLISH') },
@@ -327,7 +349,7 @@ const SCENARIO_GROUPS = [
 
       { title: '欠勤申請・代替募集フロー', steps: [
         { label: 'リセット',              action: () => A().reset() },
-        { label: '福田ひよりにシフト付与', action: () => { F().DEMO.shiftRequests.push({staffId:33,date:'2025-08-05',start:'10:00',end:'18:00'}); A().confirmShift('2025-08-05',33); } },
+        { label: '福田ひよりにシフト付与', action: () => { F().DEMO.shiftRequests.push({staffId:33,date:addDays(today(),3),start:'10:00',end:'18:00'}); A().confirmShift(addDays(today(),3),33); } },
         { label: '山田太郎で確定・公開',  action: () => { A().loginAsStaff(3); A().transition('SHIFT_CONFIRM'); A().transition('SHIFT_PUBLISH'); A().logout(); } },
         { label: '福田ひよりログイン',    action: () => A().loginAsStaff(33) },
         { label: '欠勤申請',              action: () => { A().setStaffState(33,'欠勤申請中'); A().jumpToState('欠勤申請中'); }, detail: '欠勤申請中へ' },
@@ -398,126 +420,86 @@ const SCENARIO_GROUPS = [
     id: 'days30', label: '30日間シミュレーション', cls: 'g-30days',
     scenarios: [
 
-      { title: '8月：渋谷店の30日間', steps: [
-        { label: 'リセット',               detail: '全データ初期化', action: () => A().reset() },
+      { title: '今日から30日：渋谷店', steps: [
+        { label: 'リセット', detail: '全データ初期化', action: () => A().reset() },
 
-        // -- Week1: 勤務希望提出フェーズ --
-        { label: '【Week1】田中花子：希望提出', detail: '8/1,3,5,7', action: () => {
+        // -- Week1: 勤務希望提出フェーズ（今日+0,2,4,6日） --
+        { label: '【Week1】田中花子：希望提出', detail: '今日+0,2,4,6日', action: () => {
             A().loginAsStaff(7);
-            [['2025-08-01','10:00','18:00'],['2025-08-03','13:00','21:00'],['2025-08-05','10:00','18:00'],['2025-08-07','10:00','18:00']].forEach(([d,s,e])=>{A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
+            [[0,'10:00','18:00'],[2,'13:00','21:00'],[4,'10:00','18:00'],[6,'10:00','18:00']].forEach(([n,s,e])=>{const d=addDays(today(),n);A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
             A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
         }},
-        { label: '加藤健太：希望提出', detail: '8/2,4,6,8', action: () => {
+        { label: '加藤健太：希望提出', detail: '今日+1,3,5,7日', action: () => {
             A().loginAsStaff(10);
-            [['2025-08-02','10:00','18:00'],['2025-08-04','13:00','21:00'],['2025-08-06','10:00','18:00'],['2025-08-08','10:00','18:00']].forEach(([d,s,e])=>{A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
+            [[1,'10:00','18:00'],[3,'13:00','21:00'],[5,'10:00','18:00'],[7,'10:00','18:00']].forEach(([n,s,e])=>{const d=addDays(today(),n);A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
             A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
         }},
-        { label: '山本勇気：希望提出', detail: '8/1,2,3,8', action: () => {
+        { label: '山本勇気：希望提出', detail: '今日+0,1,2,7日', action: () => {
             A().loginAsStaff(12);
-            [['2025-08-01','13:00','21:00'],['2025-08-02','10:00','18:00'],['2025-08-03','10:00','18:00'],['2025-08-08','13:00','21:00']].forEach(([d,s,e])=>{A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
+            [[0,'13:00','21:00'],[1,'10:00','18:00'],[2,'10:00','18:00'],[7,'13:00','21:00']].forEach(([n,s,e])=>{const d=addDays(today(),n);A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
             A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
         }},
-        { label: '木村蓮：希望提出', detail: '8/4,5,6,7', action: () => {
+        { label: '木村蓮：希望提出', detail: '今日+3,4,5,6日', action: () => {
             A().loginAsStaff(15);
-            [['2025-08-04','10:00','18:00'],['2025-08-05','13:00','21:00'],['2025-08-06','10:00','18:00'],['2025-08-07','13:00','21:00']].forEach(([d,s,e])=>{A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
+            [[3,'10:00','18:00'],[4,'13:00','21:00'],[5,'10:00','18:00'],[6,'13:00','21:00']].forEach(([n,s,e])=>{const d=addDays(today(),n);A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
             A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
         }},
 
         // -- Week2: 店長シフト作成・公開 --
-        { label: '【Week2】山田太郎：シフト割当', detail: '全員分を割当確定', action: () => {
+        { label: '【Week2】山田太郎：シフト割当', detail: '今日〜+7日', action: () => {
             A().loginAsStaff(3);
-            [[7,'2025-08-01'],[12,'2025-08-01'],[10,'2025-08-02'],[12,'2025-08-02'],[7,'2025-08-03'],[12,'2025-08-03'],[10,'2025-08-04'],[15,'2025-08-04'],[7,'2025-08-05'],[15,'2025-08-05'],[10,'2025-08-06'],[15,'2025-08-06'],[7,'2025-08-07'],[15,'2025-08-07'],[10,'2025-08-08'],[12,'2025-08-08']].forEach(([sid,d])=>A().confirmShift(d,sid));
+            [[7,0],[12,0],[10,1],[12,1],[7,2],[12,2],[10,3],[15,3],[7,4],[15,4],[10,5],[15,5],[7,6],[15,6],[10,7],[12,7]].forEach(([sid,n])=>A().confirmShift(addDays(today(),n),sid));
         }},
         { label: 'シフト確定', action: () => A().transition('SHIFT_CONFIRM') },
         { label: 'スタッフへ公開', action: () => A().transition('SHIFT_PUBLISH') },
         { label: 'ログアウト', action: () => A().logout() },
 
         // -- Week3: 出退勤フェーズ --
-        { label: '【Week3】田中花子：出勤8/1', action: () => {
-            A().setClockIn(7,'10:02');
-            A().setWorking(7);
-        }},
-        { label: '休憩・復帰', action: () => {
-            A().transition('BREAK_START');
-            setTimeout(()=>{ try{ A().transition('BREAK_END'); }catch(e){} }, 100);
-        }},
-        { label: '退勤打刻', action: () => { A().setClockOut(7,'18:05'); A().transition('CLOCK_OUT'); A().logout(); }},
-        { label: '加藤健太：出退勤8/2', action: () => {
-            A().setClockIn(10,'10:01'); A().setWorking(10);
-            A().setClockOut(10,'18:10'); A().transition('CLOCK_OUT'); A().logout();
-        }},
-        { label: '山本勇気：出退勤8/3', action: () => {
-            A().setClockIn(12,'13:02'); A().setWorking(12);
-            A().setClockOut(12,'21:00'); A().transition('CLOCK_OUT'); A().logout();
-        }},
+        { label: '【Week3】田中花子：出勤', action: () => { A().setClockIn(7,'10:02'); A().setWorking(7); }},
+        { label: '休憩・復帰', action: () => { A().transition('BREAK_START'); setTimeout(()=>{ try{A().transition('BREAK_END');}catch(e){} },100); }},
+        { label: '田中花子：退勤', action: () => { A().setClockOut(7,'18:05'); A().transition('CLOCK_OUT'); A().logout(); }},
+        { label: '加藤健太：出退勤', action: () => { A().setClockIn(10,'10:01'); A().setWorking(10); A().setClockOut(10,'18:10'); A().transition('CLOCK_OUT'); A().logout(); }},
+        { label: '山本勇気：出退勤', action: () => { A().setClockIn(12,'13:02'); A().setWorking(12); A().setClockOut(12,'21:00'); A().transition('CLOCK_OUT'); A().logout(); }},
 
-        // -- Week3後半: 欠勤発生 --
-        { label: '木村蓮：欠勤申請8/4', action: () => {
-            A().loginAsStaff(15);
-            A().setStaffState(15,'欠勤申請中');
-            A().logout();
-        }},
-        { label: '山田太郎：欠勤承認→代替募集', action: () => {
-            A().loginAsStaff(3);
-            F().approveAbsence(15);
-            A().logout();
-        }},
+        // -- 欠勤発生 --
+        { label: '木村蓮：欠勤申請', action: () => { A().loginAsStaff(15); A().setStaffState(15,'欠勤申請中'); A().logout(); }},
+        { label: '山田太郎：欠勤承認', action: () => { A().loginAsStaff(3); F().approveAbsence(15); A().logout(); }},
 
-        // -- Week4: 勤怠確定 --
-        { label: '【Week4】山田太郎：勤怠確定', action: () => {
+        // -- Week4: 勤怠確定・給与計算 --
+        { label: '【Week4】勤怠確定', action: () => {
             A().loginAsStaff(3);
-            [7,10,12].forEach(id=>{
-                const s=A().getStaff(id);
-                if(s?.clockIn && s?.clockOut){ A().setStaffState(id,'勤怠未確定'); F().confirmAttendance(id); }
-            });
+            [7,10,12].forEach(id=>{ const s=A().getStaff(id); if(s?.clockIn&&s?.clockOut){ A().setStaffState(id,'勤怠未確定'); F().confirmAttendance(id); } });
             A().logout();
         }},
-        { label: '管理者：給与計算', action: () => {
-            A().loginAsStaff(1);
-            A().jumpToState('給与未計算');
-            A().transition('SALARY_CALC');
-            A().logout();
-        }},
-        { label: '30日間完了', detail: '田中・加藤・山本の勤怠確定・給与計算完了', action: () => {
-            assert(['給与未計算','給与未計算'].every((_,i)=>true), '正常完了');
-        }},
+        { label: '給与計算', action: () => { A().loginAsStaff(1); A().jumpToState('給与未計算'); A().transition('SALARY_CALC'); A().logout(); }},
+        { label: '30日間完了', detail: `今日(${today()})から30日間シミュレーション完了`, action: () => {} },
       ]},
 
-      { title: '8月：新宿店の30日間', steps: [
+      { title: '今日から30日：新宿店', steps: [
         { label: 'リセット', action: () => A().reset() },
-        { label: '中村拓也：希望提出', action: () => {
+        { label: '中村拓也：希望提出', detail: '今日+0,2,4日', action: () => {
             A().loginAsStaff(8);
-            [['2025-08-01','10:00','18:00'],['2025-08-03','10:00','18:00'],['2025-08-05','13:00','21:00']].forEach(([d,s,e])=>{A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
+            [[0,'10:00','18:00'],[2,'10:00','18:00'],[4,'13:00','21:00']].forEach(([n,s,e])=>{const d=addDays(today(),n);A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
             A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
         }},
-        { label: '吉田あおい：希望提出', action: () => {
+        { label: '吉田あおい：希望提出', detail: '今日+1,3,5日', action: () => {
             A().loginAsStaff(11);
-            [['2025-08-02','13:00','21:00'],['2025-08-04','10:00','18:00'],['2025-08-06','10:00','18:00']].forEach(([d,s,e])=>{A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
+            [[1,'13:00','21:00'],[3,'10:00','18:00'],[5,'10:00','18:00']].forEach(([n,s,e])=>{const d=addDays(today(),n);A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
             A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
         }},
-        { label: '鈴木恵子（新宿店長）：シフト割当', action: () => {
+        { label: '鈴木恵子：シフト割当', action: () => {
             A().loginAsStaff(4);
-            [[8,'2025-08-01'],[11,'2025-08-02'],[8,'2025-08-03'],[11,'2025-08-04'],[8,'2025-08-05'],[11,'2025-08-06']].forEach(([sid,d])=>A().confirmShift(d,sid));
+            [[8,0],[11,1],[8,2],[11,3],[8,4],[11,5]].forEach(([sid,n])=>A().confirmShift(addDays(today(),n),sid));
         }},
         { label: 'シフト確定・公開', action: () => { A().transition('SHIFT_CONFIRM'); A().transition('SHIFT_PUBLISH'); A().logout(); }},
-        { label: '中村拓也：出退勤', action: () => {
-            A().loginAsStaff(8);
-            A().setClockIn(8,'10:01'); A().setClockOut(8,'18:05');
-            A().setWorking(A().getCurrentStaff()?.id);
-            A().transition('CLOCK_OUT'); A().logout();
-        }},
-        { label: '吉田あおい：残業発生', action: () => {
-            A().loginAsStaff(11);
-            A().setClockIn(11,'13:02');
-            A().setWorking(A().getCurrentStaff()?.id);
-            A().logout();
-        }},
+        { label: '中村拓也：出退勤', action: () => { A().setClockIn(8,'10:01'); A().setWorking(8); A().setClockOut(8,'18:05'); A().transition('CLOCK_OUT'); A().logout(); }},
+        { label: '吉田あおい：残業発生', action: () => { A().setClockIn(11,'13:02'); A().setStaffState(11,'残業申請中'); A().logout(); }},
         { label: '鈴木恵子：残業承認', action: () => { A().loginAsStaff(4); F().approveOvertime(11); A().logout(); }},
         { label: '勤怠確定・給与計算', action: () => {
             A().loginAsStaff(4); [8,11].forEach(id=>{ A().setStaffState(id,'勤怠未確定'); F().confirmAttendance(id); }); A().logout();
             A().loginAsStaff(1); A().jumpToState('給与未計算'); A().transition('SALARY_CALC'); A().logout();
         }},
-        { label: '新宿店30日間完了', action: () => {} },
+        { label: '新宿店30日間完了', detail: '今日から30日間完了', action: () => {} },
       ]},
 
     ]
@@ -530,109 +512,106 @@ const SCENARIO_GROUPS = [
     id: 'months3', label: '3ヶ月間シミュレーション', cls: 'g-3months',
     scenarios: [
 
-      { title: '7-9月：渋谷店フル稼働', steps: [
+      { title: '今日から3ヶ月：渋谷店フル稼働', steps: [
         { label: 'リセット', action: () => A().reset() },
 
-        // - 7月 -
-        { label: '【7月】田中花子・加藤健太：希望提出', action: () => {
-            [[7,['2025-07-01','2025-07-08','2025-07-15','2025-07-22']],[10,['2025-07-03','2025-07-10','2025-07-17','2025-07-24']]].forEach(([sid,dates])=>{
+        // -- 1ヶ月目（今日〜+30日）--
+        { label: '【1ヶ月目】田中・加藤：希望提出', detail: '今日+0,7,14,21日', action: () => {
+            [[7,[0,7,14,21],'10:00','18:00'],[10,[3,10,17,24],'10:00','18:00']].forEach(([sid,offsets,s,e])=>{
                 A().loginAsStaff(sid);
-                dates.forEach(d=>{ A().setFormValue('inp-shift-date',d); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); });
+                offsets.forEach(n=>{const d=addDays(today(),n);A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
                 A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
             });
         }},
-        { label: '7月シフト作成・公開', action: () => {
+        { label: '1ヶ月目：シフト作成・公開', action: () => {
             A().loginAsStaff(3);
-            [['2025-07-01',7],['2025-07-03',10],['2025-07-08',7],['2025-07-10',10],['2025-07-15',7],['2025-07-17',10],['2025-07-22',7],['2025-07-24',10]].forEach(([d,sid])=>A().confirmShift(d,sid));
+            [[7,0],[10,3],[7,7],[10,10],[7,14],[10,17],[7,21],[10,24]].forEach(([sid,n])=>A().confirmShift(addDays(today(),n),sid));
             A().transition('SHIFT_CONFIRM'); A().transition('SHIFT_PUBLISH'); A().logout();
         }},
-        { label: '7月：全員出退勤', action: () => {
-            [[7,'2025-07-01','10:02','18:05',60],[10,'2025-07-03','10:01','18:10',60],[7,'2025-07-08','10:00','18:00',60],[10,'2025-07-10','10:03','18:05',60]].forEach(([sid,d,ci,co,bm])=>{
+        { label: '1ヶ月目：全員出退勤', action: () => {
+            [[7,'10:02','18:05',60],[10,'10:01','18:10',60]].forEach(([sid,ci,co,bm])=>{
                 A().setStaffClock(sid,ci,co,bm); A().setStaffState(sid,'勤怠未確定');
             });
         }},
-        { label: '7月：勤怠確定・給与計算', action: () => {
-            A().loginAsStaff(3); [7,10].forEach(id=>{ const s=F().DEMO.staff.find(s=>s.id===id); if(s.clockIn&&s.clockOut){ F().confirmAttendance(id); } }); A().logout();
+        { label: '1ヶ月目：勤怠確定・給与計算', action: () => {
+            A().loginAsStaff(3); [7,10].forEach(id=>{ const s=A().getStaff(id); if(s?.clockIn&&s?.clockOut){F().confirmAttendance(id);} }); A().logout();
             A().loginAsStaff(1); A().jumpToState('給与未計算'); A().transition('SALARY_CALC'); A().logout();
         }},
 
-        // - 8月 -
-        { label: '【8月】全員：希望提出', action: () => {
-            [[7,['2025-08-05','2025-08-12','2025-08-19','2025-08-26']],[10,['2025-08-07','2025-08-14','2025-08-21','2025-08-28']],[12,['2025-08-06','2025-08-13','2025-08-20','2025-08-27']],[15,['2025-08-08','2025-08-15','2025-08-22','2025-08-29']]].forEach(([sid,dates])=>{
-                A().loginAsStaff(sid);
-                dates.forEach(d=>{ A().setFormValue('inp-shift-date',d); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); });
+        // -- 2ヶ月目（今日+31〜+60日）--
+        { label: '【2ヶ月目】4名で希望提出', detail: '今日+32,35,38,41日〜', action: () => {
+            [[7,[32,39,46,53],'10:00','18:00'],[10,[35,42,49,56],'10:00','18:00'],[12,[33,40,47,54],'10:00','18:00'],[15,[36,43,50,57],'10:00','18:00']].forEach(([sid,offsets,s,e])=>{
+                A().loginAsStaff(sid); F().DEMO.staff.find(st=>st.id===sid).state='未ログイン';
+                offsets.forEach(n=>{const d=addDays(today(),n);A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
                 A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
             });
         }},
-        { label: '8月シフト作成・公開', action: () => {
+        { label: '2ヶ月目：シフト作成・公開', action: () => {
             A().loginAsStaff(3);
-            [[7,'2025-08-05'],[10,'2025-08-07'],[12,'2025-08-06'],[15,'2025-08-08'],[7,'2025-08-12'],[10,'2025-08-14'],[12,'2025-08-13'],[15,'2025-08-15'],[7,'2025-08-19'],[10,'2025-08-21'],[12,'2025-08-20'],[15,'2025-08-22'],[7,'2025-08-26'],[10,'2025-08-28'],[12,'2025-08-27'],[15,'2025-08-29']].forEach(([sid,d])=>A().confirmShift(d,sid));
+            [[7,32],[10,35],[12,33],[15,36],[7,39],[10,42],[12,40],[15,43],[7,46],[10,49],[12,47],[15,50],[7,53],[10,56],[12,54],[15,57]].forEach(([sid,n])=>A().confirmShift(addDays(today(),n),sid));
             A().transition('SHIFT_CONFIRM'); A().transition('SHIFT_PUBLISH'); A().logout();
         }},
-        { label: '8月中旬：木村蓮が欠勤', action: () => {
-            A().loginAsStaff(15); A().setStaffState(15,'欠勤申請中'); A().jumpToState('欠勤申請中'); A().logout();
+        { label: '2ヶ月目中旬：木村蓮が欠勤', action: () => {
+            A().loginAsStaff(15); A().setStaffState(15,'欠勤申請中'); A().logout();
             A().loginAsStaff(3); F().approveAbsence(15); A().logout();
         }},
-        { label: '8月：出退勤（田中・加藤）', action: () => {
+        { label: '2ヶ月目：出退勤（田中・加藤）', action: () => {
             [[7,'10:02','18:05',60],[10,'10:01','18:10',60]].forEach(([sid,ci,co,bm])=>{ A().setStaffClock(sid,ci,co,bm); A().setStaffState(sid,'勤怠未確定'); });
         }},
-        { label: '8月：勤怠確定・給与計算', action: () => {
-            A().loginAsStaff(3); [7,10,12].forEach(id=>{ const s=F().DEMO.staff.find(s=>s.id===id); if(s.clockIn&&s.clockOut){ F().confirmAttendance(id); } }); A().logout();
+        { label: '2ヶ月目：勤怠確定・給与計算', action: () => {
+            A().loginAsStaff(3); [7,10,12].forEach(id=>{ const s=A().getStaff(id); if(s?.clockIn&&s?.clockOut){F().confirmAttendance(id);} }); A().logout();
             A().loginAsStaff(1); A().jumpToState('給与未計算'); A().transition('SALARY_CALC'); A().logout();
         }},
 
-        // - 9月 -
-        { label: '【9月】3名で希望提出（木村は復帰）', action: () => {
-            [[7,['2025-09-02','2025-09-09','2025-09-16']],[10,['2025-09-04','2025-09-11','2025-09-18']],[15,['2025-09-03','2025-09-10','2025-09-17']]].forEach(([sid,dates])=>{
-                A().loginAsStaff(sid); A().setStaffState(sid,'未ログイン');
-                dates.forEach(d=>{ A().setFormValue('inp-shift-date',d); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); });
+        // -- 3ヶ月目（今日+61〜+90日）--
+        { label: '【3ヶ月目】3名で希望提出（木村は復帰）', detail: '今日+63,70,77日〜', action: () => {
+            [[7,[63,70,77],'10:00','18:00'],[10,[65,72,79],'10:00','18:00'],[15,[64,71,78],'10:00','18:00']].forEach(([sid,offsets,s,e])=>{
+                A().loginAsStaff(sid); F().DEMO.staff.find(st=>st.id===sid).state='未ログイン';
+                offsets.forEach(n=>{const d=addDays(today(),n);A().setFormValue('inp-shift-date',d);A().setFormValue('inp-shift-start',s);A().setFormValue('inp-shift-end',e);F().addShiftRequest();});
                 A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
             });
         }},
-        { label: '9月シフト確定・公開', action: () => {
+        { label: '3ヶ月目：シフト確定・公開', action: () => {
             A().loginAsStaff(3);
-            [[7,'2025-09-02'],[10,'2025-09-04'],[15,'2025-09-03'],[7,'2025-09-09'],[10,'2025-09-11'],[15,'2025-09-10'],[7,'2025-09-16'],[10,'2025-09-18'],[15,'2025-09-17']].forEach(([sid,d])=>A().confirmShift(d,sid));
+            [[7,63],[10,65],[15,64],[7,70],[10,72],[15,71],[7,77],[10,79],[15,78]].forEach(([sid,n])=>A().confirmShift(addDays(today(),n),sid));
             A().transition('SHIFT_CONFIRM'); A().transition('SHIFT_PUBLISH'); A().logout();
         }},
-        { label: '9月：出退勤', action: () => {
+        { label: '3ヶ月目：出退勤', action: () => {
             [[7,'10:01','18:00',60],[10,'10:03','18:10',60],[15,'10:00','18:05',60]].forEach(([sid,ci,co,bm])=>{ A().setStaffClock(sid,ci,co,bm); A().setStaffState(sid,'勤怠未確定'); });
         }},
-        { label: '9月：勤怠確定・給与計算', action: () => {
-            A().loginAsStaff(3); [7,10,15].forEach(id=>{ const s=F().DEMO.staff.find(s=>s.id===id); if(s.clockIn&&s.clockOut){ F().confirmAttendance(id); } }); A().logout();
+        { label: '3ヶ月目：勤怠確定・給与計算', action: () => {
+            A().loginAsStaff(3); [7,10,15].forEach(id=>{ const s=A().getStaff(id); if(s?.clockIn&&s?.clockOut){F().confirmAttendance(id);} }); A().logout();
             A().loginAsStaff(1); A().jumpToState('給与未計算'); A().transition('SALARY_CALC'); A().logout();
         }},
-        { label: '【完了】3ヶ月間シミュレーション終了', detail: '7月〜9月 渋谷店フル稼働完了', action: () => {
-            A().loginAsStaff(7);
-        }},
+        { label: '【完了】3ヶ月間シミュレーション終了', detail: '今日から3ヶ月間 渋谷店フル稼働完了', action: () => { A().loginAsStaff(7); }},
       ]},
 
-      { title: '7-9月：トラブル多発シナリオ', steps: [
+      { title: '今日から3ヶ月：トラブル多発シナリオ', steps: [
         { label: 'リセット', action: () => A().reset() },
-        { label: '7月：通常運営（希望〜公開）', action: () => {
-            A().loginAsStaff(7); A().setFormValue('inp-shift-date','2025-07-05'); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
-            A().loginAsStaff(3); A().confirmShift('2025-07-05',7); A().transition('SHIFT_CONFIRM'); A().transition('SHIFT_PUBLISH'); A().logout();
+        { label: '1ヶ月目：通常運営', action: () => {
+            A().loginAsStaff(7); A().setFormValue('inp-shift-date',addDays(today(),5)); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','18:00'); F().addShiftRequest(); A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
+            A().loginAsStaff(3); A().confirmShift(addDays(today(),5),7); A().transition('SHIFT_CONFIRM'); A().transition('SHIFT_PUBLISH'); A().logout();
         }},
-        { label: '8月：複数欠勤発生', action: () => {
-            // 田中・加藤が同時に欠勤申請
-            [7,10].forEach(id=>{ A().loginAsStaff(id); A().setStaffState(id,'欠勤申請中'); A().jumpToState('欠勤申請中'); A().logout(); });
+        { label: '2ヶ月目：複数欠勤発生', action: () => {
+            [7,10].forEach(id=>{ A().loginAsStaff(id); A().setStaffState(id,'欠勤申請中'); A().logout(); });
         }},
         { label: '店長：2件同時承認→代替募集', action: () => {
             A().loginAsStaff(3); [7,10].forEach(id=>F().approveAbsence(id));
-            assert(F().DEMO.staff.find(s=>s.id===7).state==='代替募集中','田中：代替募集中');
-            assert(F().DEMO.staff.find(s=>s.id===10).state==='代替募集中','加藤：代替募集中');
+            assert(A().getStaff(7).state==='代替募集中','田中：代替募集中');
+            assert(A().getStaff(10).state==='代替募集中','加藤：代替募集中');
             A().logout();
         }},
-        { label: '8月：残業多発週（2名残業申請）', action: () => {
+        { label: '2ヶ月目：残業多発（2名申請）', action: () => {
             [12,15].forEach(id=>{ A().setStaffClock(id,'10:00',undefined,0); A().setStaffState(id,'残業申請中'); });
             A().loginAsStaff(3); F().approveOvertime(12); F().approveOvertime(15); A().logout();
         }},
-        { label: '9月：通知失敗シミュレーション', action: () => {
+        { label: '3ヶ月目：通知失敗シミュレーション', action: () => {
             [47,48].forEach(id=>{ A().setStaffState(id,'通知送信失敗'); });
             A().loginAsStaff(1); A().jumpToState('通知送信失敗'); A().transition('NOTIFY_RETRY'); A().logout();
         }},
-        { label: '9月：新スタッフ初回ログイン', action: () => {
-            A().loginAsStaff(49); // 三浦朝陽（新規）
-            A().setFormValue('inp-shift-date','2025-09-10'); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','16:00'); F().addShiftRequest();
+        { label: '3ヶ月目：新スタッフ初回ログイン', action: () => {
+            A().loginAsStaff(49);
+            A().setFormValue('inp-shift-date',addDays(today(),70)); A().setFormValue('inp-shift-start','10:00'); A().setFormValue('inp-shift-end','16:00'); F().addShiftRequest();
             A().transition('SHIFT_REQUEST_SUBMIT'); A().logout();
         }},
         { label: '3ヶ月トラブル対応完了', detail: '欠勤・残業・通知失敗・新人の全パターン網羅', action: () => {} },
@@ -951,7 +930,7 @@ function buildAction(s) {
     case 'logout':             return ()=>A().logout();
     case 'transition':         return ()=>A().transition(s.event, s.payload||{});
     case 'jumpToState':        return ()=>A().jumpToState(s.state);
-    case 'addShiftRequest':    return ()=>{ A().setFormValue('inp-shift-date',s.date||'2025-08-01'); A().setFormValue('inp-shift-start',s.start||'10:00'); A().setFormValue('inp-shift-end',s.end||'18:00'); F().addShiftRequest(); };
+    case 'addShiftRequest':    return ()=>{ A().setFormValue('inp-shift-date',s.date||today()); A().setFormValue('inp-shift-start',s.start||'10:00'); A().setFormValue('inp-shift-end',s.end||'18:00'); F().addShiftRequest(); };
     case 'confirmShift':       return ()=>A().confirmShift(s.date, Number(s.staffId));
     case 'confirmAttendance':  return ()=>F().confirmAttendance(Number(s.staffId));
     case 'approveAbsence':     return ()=>F().approveAbsence(Number(s.staffId));
