@@ -118,70 +118,7 @@ const DEMO = {
     { id: 49, name: '三浦 朝陽',   role: ROLES.PART_TIME,  state: STATES.PRE_WORK,          store: '池袋店', age: 20, hourlyRate: 1100, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '出勤前' },
     { id: 50, name: '坂本 ひな',   role: ROLES.PART_TIME,  state: STATES.PRE_WORK,          store: '渋谷店', age: 23, hourlyRate: 1180, clockIn: null,    clockOut: null,    breakMin: 0,  overtimeMin: 0,   note: '出勤前' },
   ],
-  shiftRequests: [
-    // 渋谷店アルバイト（店長・管理者のシフト作成対象）
-    { staffId:  7, date: '2025-08-01', start: '10:00', end: '18:00' },  // 田中 花子
-    { staffId:  7, date: '2025-08-03', start: '13:00', end: '21:00' },
-    { staffId:  7, date: '2025-08-05', start: '10:00', end: '18:00' },
-    { staffId: 10, date: '2025-08-01', start: '13:00', end: '21:00' },  // 加藤 健太
-    { staffId: 10, date: '2025-08-02', start: '10:00', end: '18:00' },
-    { staffId: 10, date: '2025-08-04', start: '10:00', end: '18:00' },
-    { staffId: 12, date: '2025-08-02', start: '10:00', end: '18:00' },  // 山本 勇気
-    { staffId: 12, date: '2025-08-03', start: '10:00', end: '18:00' },
-    { staffId: 15, date: '2025-08-01', start: '18:00', end: '22:00' },  // 木村 蓮
-    { staffId: 15, date: '2025-08-04', start: '13:00', end: '21:00' },
-    { staffId: 16, date: '2025-08-02', start: '10:00', end: '16:00' },  // 林 奈々
-    { staffId: 16, date: '2025-08-05', start: '13:00', end: '21:00' },
-    { staffId: 19, date: '2025-08-01', start: '13:00', end: '18:00' },  // 森 悠斗
-    { staffId: 19, date: '2025-08-03', start: '10:00', end: '18:00' },
-    { staffId: 22, date: '2025-08-02', start: '09:00', end: '17:00' },  // 阿部 千夏
-    { staffId: 22, date: '2025-08-04', start: '09:00', end: '17:00' },
-    { staffId: 25, date: '2025-08-01', start: '17:00', end: '22:00' },  // 藤田 蒼
-    { staffId: 25, date: '2025-08-03', start: '17:00', end: '22:00' },
-    { staffId: 27, date: '2025-08-02', start: '08:00', end: '16:00' },  // 後藤 翔平
-    { staffId: 27, date: '2025-08-05', start: '08:00', end: '16:00' },
-    { staffId: 28, date: '2025-08-01', start: '10:00', end: '18:00' },  // 長谷川 葵
-    { staffId: 28, date: '2025-08-04', start: '13:00', end: '21:00' },
-    { staffId: 31, date: '2025-08-02', start: '10:00', end: '18:00' },  // 藤井 結月
-    { staffId: 31, date: '2025-08-05', start: '13:00', end: '21:00' },
-    { staffId: 33, date: '2025-08-03', start: '10:00', end: '18:00' },  // 福田 ひより
-    { staffId: 36, date: '2025-08-02', start: '13:00', end: '21:00' },  // 青木 陸
-    { staffId: 36, date: '2025-08-04', start: '10:00', end: '18:00' },
-    { staffId: 38, date: '2025-08-01', start: '10:00', end: '18:00' },  // 金子 海斗
-    { staffId: 38, date: '2025-08-05', start: '10:00', end: '18:00' },
-    { staffId: 41, date: '2025-08-02', start: '17:00', end: '23:00' },  // 斎藤 えみか
-    { staffId: 41, date: '2025-08-04', start: '17:00', end: '23:00' },
-    { staffId: 43, date: '2025-08-03', start: '10:00', end: '18:00' },  // 内田 朱音
-    { staffId: 43, date: '2025-08-05', start: '10:00', end: '18:00' },
-    { staffId: 46, date: '2025-08-01', start: '10:00', end: '19:00' },  // 原田 悠真
-    { staffId: 46, date: '2025-08-03', start: '10:00', end: '19:00' },
-    { staffId: 47, date: '2025-08-02', start: '10:00', end: '18:00' },  // 松田 柊
-    { staffId: 47, date: '2025-08-04', start: '13:00', end: '21:00' },
-    { staffId: 50, date: '2025-08-03', start: '10:00', end: '16:00' },  // 坂本 ひな
-    // 新宿店アルバイト（新宿店長用）
-    { staffId:  8, date: '2025-08-01', start: '10:00', end: '18:00' },  // 中村 拓也
-    { staffId: 11, date: '2025-08-02', start: '13:00', end: '21:00' },  // 吉田 あおい
-    { staffId: 14, date: '2025-08-02', start: '09:00', end: '17:00' },  // 井上 彩花
-    { staffId: 17, date: '2025-08-01', start: '10:00', end: '18:00' },  // 清水 航
-    { staffId: 23, date: '2025-08-03', start: '10:00', end: '18:00' },  // 石川 大翔
-    { staffId: 26, date: '2025-08-02', start: '18:00', end: '23:00' },  // 岡田 里奈
-    { staffId: 35, date: '2025-08-01', start: '13:00', end: '21:00' },  // 遠藤 菜々美
-    { staffId: 39, date: '2025-08-04', start: '13:00', end: '21:00' },  // 工藤 美羽
-    { staffId: 42, date: '2025-08-02', start: '08:00', end: '16:00' },  // 横山 蓮太
-    { staffId: 45, date: '2025-08-03', start: '09:00', end: '17:00' },  // 田村 葉月
-    { staffId: 48, date: '2025-08-01', start: '10:00', end: '18:00' },  // 石田 あかり
-    // 池袋店アルバイト
-    { staffId:  9, date: '2025-08-01', start: '10:00', end: '16:00' },  // 小林 さくら
-    { staffId: 13, date: '2025-08-03', start: '10:00', end: '16:00' },  // 松本 優
-    { staffId: 18, date: '2025-08-02', start: '13:00', end: '21:00' },  // 山崎 柚子
-    { staffId: 24, date: '2025-08-01', start: '13:00', end: '21:00' },  // 前田 みずき
-    { staffId: 29, date: '2025-08-04', start: '13:00', end: '21:00' },  // 村田 晴菜
-    { staffId: 34, date: '2025-08-02', start: '10:00', end: '18:00' },  // 岡本 亮
-    { staffId: 37, date: '2025-08-03', start: '13:00', end: '21:00' },  // 竹内 ゆか
-    { staffId: 40, date: '2025-08-01', start: '09:00', end: '17:00' },  // 和田 一輝
-    { staffId: 44, date: '2025-08-05', start: '13:00', end: '21:00' },  // 宮崎 大空
-    { staffId: 49, date: '2025-08-02', start: '10:00', end: '18:00' },  // 三浦 朝陽
-  ],
+  shiftRequests: [],
   // 確定済みシフト（割当確定ボタンで追加）
   confirmedShifts: [],
   // 店舗ごとのシフトフェーズ（creating → confirmed → published）
