@@ -190,6 +190,91 @@
       background: var(--primary);
       transition: width 0.3s ease;
     }
+
+    /* ── カスタムシナリオパネル ── */
+    .btn-custom {
+      background: #eeedfe; color: #534ab7; border-color: #afa9ec;
+      padding: 7px 14px; border-radius: var(--radius); font-size: 13px;
+      font-weight: 500; cursor: pointer; border: 0.5px solid;
+      font-family: inherit; display: inline-flex; align-items: center; gap: 5px;
+    }
+    .btn-custom:hover { background: #cecbf6; }
+
+    .custom-panel {
+      border-top: 0.5px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      flex-shrink: 0;
+      max-height: 60%;
+    }
+    .custom-panel-header {
+      padding: 8px 12px;
+      border-bottom: 0.5px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+      color: #534ab7;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .custom-close {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-3); font-size: 16px; padding: 2px;
+    }
+    .custom-close:hover { color: var(--text-1); }
+    #custom-json {
+      flex: 1;
+      border: none;
+      border-bottom: 0.5px solid var(--border);
+      padding: 10px 12px;
+      font-family: 'Menlo', 'Monaco', monospace;
+      font-size: 11px;
+      line-height: 1.6;
+      resize: none;
+      background: #1a1a18;
+      color: #e8e6e0;
+      min-height: 140px;
+      max-height: 200px;
+      outline: none;
+    }
+    .custom-actions {
+      padding: 8px 12px;
+      display: flex;
+      gap: 8px;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .custom-help {
+      padding: 8px 12px;
+      overflow-y: auto;
+      max-height: 120px;
+    }
+    .custom-help-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-3);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .custom-help-item {
+      font-size: 11px;
+      color: var(--text-2);
+      padding: 1px 0;
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+    }
+    .custom-help-item code {
+      background: #eeedfe;
+      color: #534ab7;
+      padding: 0 5px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: monospace;
+      flex-shrink: 0;
+    }
+    .custom-help-item span { color: var(--text-3); font-size: 10px; }
   </style>
 </head>
 <body>
@@ -220,6 +305,7 @@
       <button class="btn btn-run"   id="btn-resume" onclick="resumeScenario()" disabled style="display:none"><i class="ti ti-player-play"></i> 再開</button>
       <button class="btn btn-stop"  id="btn-stop"   onclick="stopScenario()" disabled><i class="ti ti-player-stop"></i> 中止</button>
       <button class="btn btn-reset" id="btn-reset"  onclick="resetAll()"><i class="ti ti-refresh"></i> リセット</button>
+      <button class="btn btn-custom" onclick="toggleCustomPanel()"><i class="ti ti-code"></i> カスタム</button>
     </div>
 
     <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-bar" style="width:0%"></div></div>
@@ -241,6 +327,41 @@
     </div>
 
     <div class="step-log" id="step-log"></div>
+
+    <!-- カスタムシナリオパネル -->
+    <div class="custom-panel" id="custom-panel" style="display:none">
+      <div class="custom-panel-header">
+        <span><i class="ti ti-code"></i> カスタムシナリオ</span>
+        <button class="custom-close" onclick="closeCustomPanel()"><i class="ti ti-x"></i></button>
+      </div>
+      <textarea id="custom-json" spellcheck="false" placeholder='{
+  "title": "バグ再現シナリオ",
+  "steps": [
+    { "action": "reset" },
+    { "action": "loginAsStaff", "staffId": 7 },
+    { "action": "addShiftRequest", "date": "2025-08-05", "start": "10:00", "end": "18:00" },
+    { "action": "transition", "event": "SHIFT_REQUEST_SUBMIT" }
+  ]
+}'></textarea>
+      <div class="custom-actions">
+        <button class="btn btn-reset" onclick="loadCustomScenario()"><i class="ti ti-upload"></i> 読み込む</button>
+        <button class="btn btn-run"   onclick="loadAndRun()"        id="btn-custom-run" disabled><i class="ti ti-player-play"></i> 読込んで実行</button>
+      </div>
+      <div class="custom-help">
+        <div class="custom-help-title">使えるアクション</div>
+        <div class="custom-help-item"><code>reset</code> — 全データ初期化</div>
+        <div class="custom-help-item"><code>loginAsStaff</code> <span>staffId: 番号</span></div>
+        <div class="custom-help-item"><code>logout</code></div>
+        <div class="custom-help-item"><code>addShiftRequest</code> <span>date / start / end</span></div>
+        <div class="custom-help-item"><code>transition</code> <span>event: イベント名</span></div>
+        <div class="custom-help-item"><code>confirmShift</code> <span>date / staffId</span></div>
+        <div class="custom-help-item"><code>jumpToState</code> <span>state: 状態名</span></div>
+        <div class="custom-help-item"><code>wait</code> <span>ms: 待機ミリ秒</span></div>
+        <div class="custom-help-item"><code>confirmAttendance</code> <span>staffId</span></div>
+        <div class="custom-help-item"><code>approveAbsence</code> <span>staffId</span></div>
+        <div class="custom-help-item"><code>approveOvertime</code> <span>staffId</span></div>
+      </div>
+    </div>
   </div>
 
   <!-- 右ペイン -->
@@ -556,6 +677,126 @@ function log(type, label, detail) {
 
 /* ── 初期化 ── */
 selectScenario(0);
+
+/* ═══════════════════════════════════════
+   カスタムシナリオ（JSON貼り付け実行）
+═══════════════════════════════════════ */
+
+function toggleCustomPanel() {
+  const panel = document.getElementById('custom-panel');
+  panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+  if (panel.style.display === 'flex') {
+    panel.style.flexDirection = 'column';
+  }
+}
+
+function closeCustomPanel() {
+  document.getElementById('custom-panel').style.display = 'none';
+}
+
+/* JSONを解析してstepsに変換 */
+function parseCustomScenario(jsonText) {
+  const data = JSON.parse(jsonText);
+  if (!data.steps || !Array.isArray(data.steps)) throw new Error('steps配列がありません');
+
+  return {
+    title: data.title || 'カスタムシナリオ',
+    steps: data.steps.map((s, i) => {
+      const label  = s.label  || s.action;
+      const detail = s.detail || JSON.stringify(s);
+      const action = buildAction(s);
+      return { label, detail, action };
+    })
+  };
+}
+
+/* アクション名→実行関数に変換 */
+function buildAction(s) {
+  switch (s.action) {
+    case 'reset':
+      return () => API.reset();
+    case 'loginAsStaff':
+      return () => API.loginAsStaff(Number(s.staffId));
+    case 'logout':
+      return () => API.logout();
+    case 'transition':
+      return () => API.transition(s.event, s.payload || {});
+    case 'jumpToState':
+      return () => API.jumpToState(s.state);
+    case 'addShiftRequest':
+      return () => {
+        API.setFormValue('inp-shift-date',  s.date  || '2025-08-01');
+        API.setFormValue('inp-shift-start', s.start || '10:00');
+        API.setFormValue('inp-shift-end',   s.end   || '18:00');
+        frame.contentWindow.addShiftRequest();
+      };
+    case 'confirmShift':
+      return () => API.confirmShift(s.date, Number(s.staffId));
+    case 'confirmAttendance':
+      return () => frame.contentWindow.confirmAttendance(Number(s.staffId));
+    case 'approveAbsence':
+      return () => frame.contentWindow.approveAbsence(Number(s.staffId));
+    case 'rejectAbsence':
+      return () => frame.contentWindow.rejectAbsence(Number(s.staffId));
+    case 'approveOvertime':
+      return () => frame.contentWindow.approveOvertime(Number(s.staffId));
+    case 'rejectOvertime':
+      return () => frame.contentWindow.rejectOvertime(Number(s.staffId));
+    case 'wait':
+      // waitは非同期なので特別扱い（stepIdx++を遅らせる）
+      return () => { /* waitはrunNextで特別処理 */ };
+    case 'setStaffState':
+      return () => {
+        const st = frame.contentWindow.DEMO.staff.find(s2 => s2.id === Number(s.staffId));
+        if (st) st.state = s.state;
+        frame.contentWindow.updateGuideOnStateChange();
+      };
+    case 'setClockIn':
+      return () => {
+        const st = frame.contentWindow.DEMO.staff.find(s2 => s2.id === Number(s.staffId));
+        if (st) { st.clockIn = s.time; st.clockOut = null; }
+        frame.contentWindow.updateGuideOnStateChange();
+      };
+    case 'setClockOut':
+      return () => {
+        const st = frame.contentWindow.DEMO.staff.find(s2 => s2.id === Number(s.staffId));
+        if (st) st.clockOut = s.time;
+        frame.contentWindow.updateGuideOnStateChange();
+      };
+    default:
+      throw new Error(`未知のアクション: ${s.action}`);
+  }
+}
+
+/* JSONを読み込んでカスタムシナリオとしてセット */
+function loadCustomScenario() {
+  const json = document.getElementById('custom-json').value.trim();
+  if (!json) { log('warn', '入力なし', 'JSONを貼り付けてください'); return; }
+  try {
+    const scenario = parseCustomScenario(json);
+    // SENARIOSの末尾に追加（または上書き）
+    SCENARIOS[4] = scenario;
+    currentScenarioIdx = 4;
+    // シナリオボタンを更新
+    document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+    steps   = scenario.steps;
+    stepIdx = 0;
+    renderStepLog();
+    document.getElementById('progress-bar').style.width = '0%';
+    document.getElementById('btn-custom-run').disabled = (API === null);
+    log('ok', `読み込み完了: ${scenario.title}`, `${scenario.steps.length}ステップ`);
+  } catch(e) {
+    log('error', 'JSON解析エラー', e.message);
+  }
+}
+
+/* 読み込んですぐ実行 */
+function loadAndRun() {
+  loadCustomScenario();
+  if (SCENARIOS[4]) {
+    setTimeout(() => runScenario(), 300);
+  }
+}
 </script>
 </body>
 </html>
