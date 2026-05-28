@@ -1382,7 +1382,7 @@ function buildView(state) {
       <div class="view-card">
         <h2 class="view-title"><i class="ti ti-clock"></i> 出勤前</h2>
         ${staffChip(st)}
-        <div class="info-row"><span class="info-label">本日シフト</span><span class="${shiftClass}">${shiftText}</span></div>
+        ${(todayShift || isPartTime) ? `<div class="info-row"><span class="info-label">本日シフト</span><span class="${shiftClass}">${shiftText}</span></div>` : ''}
         ${isPartTime && !todayShift ? `<div class="warn-box" style="margin-bottom:12px"><i class="ti ti-calendar-x"></i> <strong>本日のシフトがありません。</strong>打刻できません。<br>シフトに誤りがある場合は店長へご連絡ください。</div>` : ''}
         ${!storeOpen ? `<div class="warn-box" style="margin-bottom:12px"><i class="ti ti-lock"></i> 現在、店舗が営業していません。打刻できません。</div>` : ''}
         <div class="info-row"><span class="info-label">Wi-Fi</span>
@@ -2449,24 +2449,26 @@ function renderSidebar() {
 function jumpToMyWork() {
   const s = appState.currentStaff;
   if (!s) return;
-  // 現在の打刻状態に応じて適切な画面へ
-  if (appState.currentState === STATES.WORKING || appState.currentState === STATES.ON_BREAK) {
-    // 既に出勤中 or 休憩中 → そのまま表示
-    updateGuideOnStateChange();
-  } else if (s.clockIn && !s.clockOut) {
-    // データ上は出勤中だが状態が違う → 出勤中に戻す
-    appState.currentState = STATES.WORKING;
-    appState.workStart = appState.workStart || parseHHMM(s.clockIn);
-    updateGuideOnStateChange();
-  } else if (s.clockOut) {
-    // 退勤済み → 勤怠未確定へ
+
+  // 打刻データを正として状態を決定（stateより打刻データを優先）
+  if (s.clockIn && s.clockOut) {
+    // 退勤済み → 勤怠未確定
     appState.currentState = STATES.ATTENDANCE_PENDING;
-    updateGuideOnStateChange();
+    updateStaff({ state: STATES.ATTENDANCE_PENDING });
+  } else if (s.clockIn && !s.clockOut) {
+    // 出勤打刻済・退勤前 → 休憩中か出勤中
+    if (appState.currentState !== STATES.ON_BREAK) {
+      appState.currentState = STATES.WORKING;
+      updateStaff({ state: STATES.WORKING });
+    }
+    appState.workStart = appState.workStart || parseHHMM(s.clockIn);
   } else {
-    // 未打刻 → 出勤前へ
+    // 未打刻 → 出勤前
     appState.currentState = STATES.PRE_WORK;
-    updateGuideOnStateChange();
+    updateStaff({ state: STATES.PRE_WORK });
   }
+
+  updateGuideOnStateChange();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
