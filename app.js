@@ -123,7 +123,28 @@ const DEMO = {
   confirmedShifts: [],
   // 仮割当シフト（公開済みフェーズで「割当確定」を押した分・再確定するまで保留）
   pendingShifts: [],
-  // 店舗ごとのシフトフェーズ（creating → confirmed → published）
+  // 店舗そのものの状態（営業可否・人員不足など）
+  storeState: {
+    '渋谷店': 'open',
+    '新宿店': 'open',
+    '池袋店': 'open',
+  },
+
+  // 週単位のシフト状態（旧 shiftPhase の主責務）
+  weeklyShiftState: {
+    '渋谷店': { current: 'creating' },
+    '新宿店': { current: 'creating' },
+    '池袋店': { current: 'creating' },
+  },
+
+  // 日単位のシフト状態（希望受付・割当中・確定済み・公開済みなど）
+  dailyShiftState: {
+    '渋谷店': {},
+    '新宿店': {},
+    '池袋店': {},
+  },
+
+  // 互換用：既存UI・テストランナー向けの店舗別シフトフェーズ
   shiftPhase: {
     '渋谷店': 'creating',
     '新宿店': 'creating',
@@ -172,6 +193,202 @@ function fmtMinutes(min) {
 function updateStaff(patch) {
   if (!appState.currentStaff) return;
   Object.assign(appState.currentStaff, patch);
+}
+
+
+/* ═══════════════════════════════════════
+   店舗・週・日単位の状態管理
+   - storeState: 店舗そのものの営業/運用状態
+   - weeklyShiftState: 週単位のシフト進行状態
+   - dailyShiftState: 日単位のシフト進行状態
+   - shiftPhase: 既存コード互換用（weeklyShiftState.current と同期）
+═══════════════════════════════════════ */
+const STORE_STATES = {
+  OPEN: 'open',
+  TEMPORARY_CLOSED: 'temporary_closed',
+  STAFF_SHORTAGE: 'staff_shortage',
+  RECRUITING: 'recruiting',
+  SHIFT_LOCKED: 'shift_locked',
+};
+
+const WEEKLY_SHIFT_STATES = {
+  COLLECTING_REQUESTS: 'collecting_requests',
+  CREATING: 'creating',
+  NEEDS_REVIEW: 'needs_review',
+  CONFIRMED: 'confirmed',
+  PUBLISHED: 'published',
+  IN_OPERATION: 'in_operation',
+  CLOSED: 'closed',
+};
+
+const DAILY_SHIFT_STATES = {
+  DRAFT: 'draft',
+  REQUESTED: 'requested',
+  ASSIGNING: 'assigning',
+  CONFIRMED: 'confirmed',
+  PUBLISHED: 'published',
+  STAFF_SHORTAGE: 'staff_shortage',
+  CLOSED: 'closed',
+  ATTENDANCE_PENDING: 'attendance_pending',
+  ATTENDANCE_FIXED: 'attendance_fixed',
+};
+
+function ensureStoreState(store) {
+  if (!store) return;
+  if (!DEMO.storeState) DEMO.storeState = {};
+  if (!DEMO.weeklyShiftState) DEMO.weeklyShiftState = {};
+  if (!DEMO.dailyShiftState) DEMO.dailyShiftState = {};
+  if (!DEMO.shiftPhase) DEMO.shiftPhase = {};
+
+  if (!DEMO.storeState[store]) DEMO.storeState[store] = STORE_STATES.OPEN;
+  if (!DEMO.weeklyShiftState[store]) DEMO.weeklyShiftState[store] = { current: WEEKLY_SHIFT_STATES.CREATING };
+  if (!DEMO.dailyShiftState[store]) DEMO.dailyShiftState[store] = {};
+  if (!DEMO.shiftPhase[store]) DEMO.shiftPhase[store] = DEMO.weeklyShiftState[store].current || WEEKLY_SHIFT_STATES.CREATING;
+}
+
+function getStoreState(store) {
+  ensureStoreState(store);
+  return DEMO.storeState?.[store] || STORE_STATES.OPEN;
+}
+
+function setStoreState(store, state) {
+  ensureStoreState(store);
+  if (!store) return null;
+  DEMO.storeState[store] = state;
+  updateDailyShiftStatesForStore(store);
+  return state;
+}
+
+function getCurrentWeekKey() {
+  // 現段階は既存システム互換のため current を利用。
+  // 実運用では YYYY-Wxx 形式のISO週番号に差し替え可能。
+  return 'current';
+}
+
+function getWeeklyShiftState(store, weekKey = getCurrentWeekKey()) {
+  ensureStoreState(store);
+  return DEMO.weeklyShiftState?.[store]?.[weekKey] || WEEKLY_SHIFT_STATES.CREATING;
+}
+
+function setWeeklyShiftState(store, weekKey, state) {
+  ensureStoreState(store);
+  if (!store) return null;
+  const key = weekKey || getCurrentWeekKey();
+  DEMO.weeklyShiftState[store][key] = state;
+
+  // 旧 shiftPhase と互換同期
+  if (key === 'current') DEMO.shiftPhase[store] = state;
+
+  updateDailyShiftStatesForStore(store);
+  return state;
+}
+
+function getDailyShiftState(store, date) {
+  ensureStoreState(store);
+  if (!date) return DAILY_SHIFT_STATES.DRAFT;
+  return DEMO.dailyShiftState?.[store]?.[date] || DAILY_SHIFT_STATES.DRAFT;
+}
+
+function setDailyShiftState(store, date, state) {
+  ensureStoreState(store);
+  if (!store || !date) return null;
+  DEMO.dailyShiftState[store][date] = state;
+  return state;
+}
+
+function getShiftPhase(store) {
+  return getWeeklyShiftState(store, 'current');
+}
+
+function setShiftPhase(store, phase) {
+  return setWeeklyShiftState(store, 'current', phase);
+}
+
+function getStoreDates(store) {
+  const dates = new Set();
+
+  (DEMO.shiftRequests || []).forEach(r => {
+    const s = DEMO.staff.find(st => st.id === r.staffId);
+    if (s?.store === store && r.date) dates.add(r.date);
+  });
+
+  (DEMO.confirmedShifts || []).forEach(c => {
+    const s = DEMO.staff.find(st => st.id === c.staffId);
+    if (s?.store === store && c.date) dates.add(c.date);
+  });
+
+  (DEMO.pendingShifts || []).forEach(p => {
+    const s = DEMO.staff.find(st => st.id === p.staffId);
+    if (s?.store === store && p.date) dates.add(p.date);
+  });
+
+  return [...dates].sort();
+}
+
+function countConfirmedByStoreDate(store, date) {
+  return (DEMO.confirmedShifts || []).filter(c => {
+    const s = DEMO.staff.find(st => st.id === c.staffId);
+    return s?.store === store && c.date === date;
+  }).length;
+}
+
+function countPendingByStoreDate(store, date) {
+  return (DEMO.pendingShifts || []).filter(p => {
+    const s = DEMO.staff.find(st => st.id === p.staffId);
+    return s?.store === store && p.date === date;
+  }).length;
+}
+
+function countRequestsByStoreDate(store, date) {
+  return (DEMO.shiftRequests || []).filter(r => {
+    const s = DEMO.staff.find(st => st.id === r.staffId);
+    return s?.store === store && r.date === date;
+  }).length;
+}
+
+function updateDailyShiftStatesForStore(store) {
+  ensureStoreState(store);
+  if (!store) return;
+
+  const phase = getShiftPhase(store);
+  const dates = getStoreDates(store);
+
+  dates.forEach(date => {
+    const reqCount = countRequestsByStoreDate(store, date);
+    const confirmedCount = countConfirmedByStoreDate(store, date);
+    const pendingCount = countPendingByStoreDate(store, date);
+
+    if (getStoreState(store) === STORE_STATES.TEMPORARY_CLOSED) {
+      setDailyShiftState(store, date, DAILY_SHIFT_STATES.CLOSED);
+    } else if (phase === WEEKLY_SHIFT_STATES.PUBLISHED && confirmedCount > 0) {
+      setDailyShiftState(store, date, DAILY_SHIFT_STATES.PUBLISHED);
+    } else if (phase === WEEKLY_SHIFT_STATES.CONFIRMED && confirmedCount > 0) {
+      setDailyShiftState(store, date, DAILY_SHIFT_STATES.CONFIRMED);
+    } else if (confirmedCount > 0 || pendingCount > 0) {
+      setDailyShiftState(store, date, DAILY_SHIFT_STATES.ASSIGNING);
+    } else if (reqCount > 0) {
+      setDailyShiftState(store, date, DAILY_SHIFT_STATES.REQUESTED);
+    } else {
+      setDailyShiftState(store, date, DAILY_SHIFT_STATES.DRAFT);
+    }
+  });
+}
+
+function updateDailyShiftStatesForAllStores() {
+  const stores = new Set(DEMO.staff.map(s => s.store).filter(Boolean));
+  Object.keys(DEMO.storeState || {}).forEach(store => stores.add(store));
+  stores.forEach(store => updateDailyShiftStatesForStore(store));
+}
+
+function getStoreOperationalSnapshot(store) {
+  ensureStoreState(store);
+  return {
+    store,
+    storeState: getStoreState(store),
+    weeklyShiftState: JSON.parse(JSON.stringify(DEMO.weeklyShiftState?.[store] || {})),
+    dailyShiftState: JSON.parse(JSON.stringify(DEMO.dailyShiftState?.[store] || {})),
+    shiftPhase: getShiftPhase(store),
+  };
 }
 
 /* ═══════════════════════════════════════
@@ -289,7 +506,7 @@ function doShiftConfirm() {
     return false;
   }
   if (store && DEMO.shiftPhase) {
-    DEMO.shiftPhase[store] = 'confirmed';
+    setShiftPhase(store, WEEKLY_SHIFT_STATES.CONFIRMED);
   }
   updateStaff({ note: `${store} 8月シフト確定済み` });
   return true;
@@ -298,7 +515,7 @@ function doShiftConfirm() {
 function doShiftPublish() {
   const store = appState.currentStaff?.store;
   if (store && DEMO.shiftPhase) {
-    DEMO.shiftPhase[store] = 'published';
+    setShiftPhase(store, WEEKLY_SHIFT_STATES.PUBLISHED);
   }
   updateStaff({ note: `${store} 8月シフト公開済み` });
 
@@ -327,6 +544,8 @@ function addShiftRequest() {
   const dup = DEMO.shiftRequests.find(r => r.staffId === staffId && r.date === date);
   if (dup) { showError(`${date} はすでに登録されています`); return; }
   DEMO.shiftRequests.push({ staffId, date, start, end });
+  const store = appState.currentStaff?.store;
+  if (store) updateDailyShiftStatesForStore(store);
   showToast(`${date} ${start}〜${end} を追加しました`);
   renderMainView(); // 一覧を再描画（state遷移なし）
 }
@@ -726,7 +945,7 @@ function buildView(state) {
   if (state === STATES.SHIFT_CREATING) {
     const myStore   = st?.store;
     const DOW       = ['日','月','火','水','木','金','土'];
-    const phase     = DEMO.shiftPhase?.[myStore] || 'creating';
+    const phase     = getShiftPhase(myStore);
 
     const myPartIds = new Set(
       DEMO.staff.filter(s => s.role === ROLES.PART_TIME && s.store === myStore).map(s => s.id)
@@ -901,7 +1120,7 @@ function buildView(state) {
     // phaseがpublishedの場合はconfirmedShiftsが正の数あるはず
     // まだ店長が割当操作をしていない場合は「まだ確定されていません」を表示
     const myStore2 = st?.store;
-    const storePhase = DEMO.shiftPhase?.[myStore2] || 'creating';
+    const storePhase = getShiftPhase(myStore2);
     const myConfirmed = (DEMO.confirmedShifts || []).filter(c => c.staffId === st?.id);
 
     const DOW = ['日','月','火','水','木','金','土'];
@@ -1621,7 +1840,7 @@ function loginAsStaff(staffId) {
 
   // 店長・管理者のシフトフェーズから状態を復元
   if (staff.role === ROLES.MANAGER) {
-    const phase = DEMO.shiftPhase?.[staff.store];
+    const phase = getShiftPhase(staff.store);
     if (phase === 'confirmed') targetState = STATES.SHIFT_CONFIRMED;
     else if (phase === 'published') targetState = STATES.SHIFT_PUBLISHED;
     else targetState = STATES.SHIFT_CREATING;
@@ -1910,7 +2129,7 @@ function renderSidebar() {
   // ─── 店長 ─────────────────────────────────────
   if (role === ROLES.MANAGER) {
     const store = appState.currentStaff?.store;
-    const phase = DEMO.shiftPhase?.[store] || 'creating';
+    const phase = getShiftPhase(store);
     const shiftNavHtml = (() => {
       if (phase === 'creating') return `
         <button class="nav-tab next-target" id="tab-shift-mgmt" onclick="gotoShiftPhase()">
@@ -2057,7 +2276,7 @@ function jumpToMyWork() {
 /* ─── シフトフェーズに応じた画面へ（店長用） ─── */
 function gotoShiftPhase(forceCreating) {
   const store = appState.currentStaff?.store;
-  const phase = DEMO.shiftPhase?.[store] || 'creating';
+  const phase = getShiftPhase(store);
   if (forceCreating || phase === 'creating') {
     appState.currentState = STATES.SHIFT_CREATING;
   } else if (phase === 'confirmed') {
@@ -2704,7 +2923,7 @@ function confirmShift(date, staffId) {
   staffId = Number(staffId); // onclick属性から来る場合に文字列になることがあるため
 
   const store = appState.currentStaff?.store;
-  const phase = DEMO.shiftPhase?.[store] || 'creating';
+  const phase = getShiftPhase(store);
   const name  = DEMO.staff.find(s => s.id === staffId)?.name || staffId;
   const req   = DEMO.shiftRequests.find(r => r.date === date && r.staffId === staffId);
   if (!req) return;
@@ -2726,6 +2945,7 @@ function confirmShift(date, staffId) {
       logT('SHIFT_ASSIGN', `${date} ${name} を割当確定`);
     }
   }
+  if (store) updateDailyShiftStatesForStore(store);
   renderMainView();
   renderStaffListIfAllowed();
   renderTransitionLog();
@@ -2762,7 +2982,11 @@ window.ShiftAPI = {
   getShiftRequests:() => [...DEMO.shiftRequests],
   getConfirmedShifts: () => [...(DEMO.confirmedShifts || [])],
   getPendingShifts:() => [...(DEMO.pendingShifts || [])],
-  getShiftPhase:   (store) => DEMO.shiftPhase?.[store],
+  getShiftPhase:   (store) => getShiftPhase(store),
+  getStoreState:   (store) => getStoreState(store),
+  getWeeklyShiftState: (store, weekKey) => getWeeklyShiftState(store, weekKey || 'current'),
+  getDailyShiftState:  (store, date) => getDailyShiftState(store, date),
+  getStoreOperationalSnapshot: (store) => getStoreOperationalSnapshot(store),
   getTransitionLog:() => [...appState.transitionLog],
 
   /* 操作 */
@@ -2823,6 +3047,11 @@ window.ShiftAPI = {
     return true;
   },
 
+  setStoreState: (store, state) => setStoreState(store, state),
+  setWeeklyShiftState: (store, weekKey, state) => setWeeklyShiftState(store, weekKey || 'current', state),
+  setDailyShiftState: (store, date, state) => setDailyShiftState(store, date, state),
+  updateDailyShiftStatesForStore: (store) => { updateDailyShiftStatesForStore(store); return true; },
+
   setStaffClock: (staffId, clockIn, clockOut, breakMin) => {
     const staff = DEMO.staff.find(s => s.id === Number(staffId));
     if (!staff) return false;
@@ -2846,7 +3075,13 @@ window.ShiftAPI = {
     DEMO.shiftRequests  = [];
     DEMO.confirmedShifts = [];
     DEMO.pendingShifts  = [];
-    Object.keys(DEMO.shiftPhase || {}).forEach(k => { DEMO.shiftPhase[k] = 'creating'; });
+    Object.keys(DEMO.shiftPhase || {}).forEach(k => {
+      ensureStoreState(k);
+      DEMO.storeState[k] = STORE_STATES.OPEN;
+      DEMO.weeklyShiftState[k] = { current: WEEKLY_SHIFT_STATES.CREATING };
+      DEMO.dailyShiftState[k] = {};
+      DEMO.shiftPhase[k] = WEEKLY_SHIFT_STATES.CREATING;
+    });
     DEMO.staff.forEach(s => {
       s.state = STATES.LOGGED_OUT;
       s.clockIn = null; s.clockOut = null;
@@ -2873,6 +3108,9 @@ window.ShiftAPI = {
     shiftRequests:   [...DEMO.shiftRequests],
     confirmedShifts: [...(DEMO.confirmedShifts || [])],
     pendingShifts:   [...(DEMO.pendingShifts   || [])],
+    storeState:      JSON.parse(JSON.stringify(DEMO.storeState || {})),
+    weeklyShiftState:JSON.parse(JSON.stringify(DEMO.weeklyShiftState || {})),
+    dailyShiftState: JSON.parse(JSON.stringify(DEMO.dailyShiftState || {})),
     shiftPhase:      { ...(DEMO.shiftPhase     || {}) },
     transitionLog:   appState.transitionLog.slice(0, 20),
   }),
